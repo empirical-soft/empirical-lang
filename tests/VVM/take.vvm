@@ -1,0 +1,53 @@
+; two Dataframe definitions
+$0 = {"name": Sv, "age": i64v, "salary": f64v}
+$1 = {"name": Sv, "salary": f64v}
+alloc $0 %0
+
+; set string column
+@0 = "A"
+@1 = "B"
+@2 = "C"
+member %0 0 %1
+alloc Sv %2
+append @0 Ss %2
+append @1 Ss %2
+append @2 Ss %2
+assign %2 Sv %1
+
+; set integer column
+member %0 1 %3
+alloc i64v %4
+append 1 i64s %4
+append 2 i64s %4
+append 3 i64s %4
+assign %4 i64v %3
+
+; set floating-point column
+@3 = 1.100000
+@4 = 2.200000
+@5 = 3.300000
+member %0 2 %5
+alloc f64v %6
+append @3 f64s %6
+append @4 f64s %6
+append @5 f64s %6
+assign %6 f64v %5
+
+; display original table
+repr %0 $0 %7
+write %7
+
+;; name age salary
+;;    A   1    1.1
+;;    B   2    2.2
+;;    C   3    3.3
+
+; take only the new columns
+take $0 $1 %0 %10
+repr %10 $1 %11
+write %11
+
+;; name salary
+;;    A    1.1
+;;    B    2.2
+;;    C    3.3

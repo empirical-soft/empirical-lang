@@ -1,0 +1,13 @@
+""" example of a docstring """
+
+let x = 1+2*3
+print(x)
+##7
+
+let y = (1+2)*3
+print(y)
+##9
+
+let z = 1 < -3
+print(z)
+##false

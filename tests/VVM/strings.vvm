@@ -1,0 +1,7 @@
+; store string in const pool
+@1 = "Hello"
+
+; display
+write @1
+
+;;Hello

@@ -1,0 +1,14 @@
+; initial value
+assign 17 i64s %0
+
+; jump over the next instructions, which would increment value
+br next
+add_i64s_i64s %0 23 %0
+add_i64s_i64s %0 51 %0
+
+; print result
+next:
+repr %0 i64s %1
+write %1
+
+;;17

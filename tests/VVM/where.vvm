@@ -1,0 +1,34 @@
+$1 = {i64v, i64v}
+
+alloc $1 %1
+
+; first column: [1, 2, 3]
+member %1 0 %2
+alloc i64v %3
+append 1 i64s %3
+append 2 i64s %3
+append 3 i64s %3
+assign %3 i64v %2
+
+; second column: [4, 5, 6]
+member %1 1 %4
+alloc i64v %5
+append 4 i64s %5
+append 5 i64s %5
+append 6 i64s %5
+assign %5 i64v %4
+
+; where with [true, false, true]
+alloc b8v %6
+append 1 b8s %6
+append 0 b8s %6
+append 1 b8s %6
+where %1 %6 $1 %7
+
+; write result
+repr %7 $1 %8
+write %8
+
+;;    
+;; 1 4
+;; 3 6

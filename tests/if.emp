@@ -1,0 +1,24 @@
+func color_code(color: String) -> Int64:
+  if color == "red":
+    return 1
+  elif color == "orange":
+    return 2
+  elif color == "yellow":
+    return 3
+  elif color == "green":
+    return 4
+  elif color == "blue":
+    return 5
+  else:
+    return 6
+  end
+end
+
+print(color_code("red"))
+##1
+
+print(color_code("yellow"))
+##3
+
+print(color_code("black"))
+##6

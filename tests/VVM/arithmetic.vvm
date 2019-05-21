@@ -1,0 +1,17 @@
+; put value in register
+assign 17 i64s %1
+
+; add register to an immediate
+add_i64s_i64s %1 19 %2
+
+; act on an immediate
+neg_i64s 23 %3
+
+; add across registers
+add_i64s_i64s %2 %3 %4
+
+; print results
+repr %4 i64s %5
+write %5
+
+;;13

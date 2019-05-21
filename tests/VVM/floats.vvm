@@ -1,0 +1,10 @@
+; store floats in const pool
+@1 = 3.14
+@2 = 2.0
+
+; multiply
+mul_f64s_f64s @1 @2 %1
+repr %1 f64s %2
+write %2
+
+;;6.28

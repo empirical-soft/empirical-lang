@@ -1,0 +1,21 @@
+; mimic a Dataframe as struct-of-arrays
+$1 = {Sv, i64v, f64v}
+alloc $1 %0
+
+; create temporary array
+@0 = 1.1
+@1 = 2.2
+alloc f64v %2
+append @0 f64s %2
+append @1 f64s %2
+
+; store temporary array in Dataframe's column
+member %0 2 %1
+assign %2 f64v %1
+
+; print column
+member %0 2 %3
+repr %3 f64v %4
+write %4
+
+;;[1.1, 2.2]

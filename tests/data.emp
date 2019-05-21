@@ -1,0 +1,16 @@
+data Trade:
+  symbol: String,
+  price: Float64,
+  size: Int64
+end
+
+let trades = !Trade(["A", "B"], [1.1, 2.2], [100, 200])
+
+print(trades.symbol)
+##["A", "B"]
+
+print(trades.price)
+##[1.1, 2.2]
+
+print(trades.size)
+##[100, 200]

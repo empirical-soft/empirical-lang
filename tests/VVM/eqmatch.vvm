@@ -1,0 +1,95 @@
+; mimic a Dataframe as a struct-of-arrays
+$0 = {Sv, i64v}
+
+; set right and left tables
+alloc $0 %0
+alloc $0 %10
+
+; set right strings
+@0 = "C"
+@1 = "F"
+@2 = "D"
+@3 = "E"
+@4 = "B"
+@5 = "V"
+alloc Sv %1
+append @0 Ss %1
+append @1 Ss %1
+append @2 Ss %1
+append @3 Ss %1
+append @3 Ss %1
+append @0 Ss %1
+append @4 Ss %1
+append @0 Ss %1
+append @1 Ss %1
+append @5 Ss %1
+member %0 0 %2
+assign %1 Sv %2
+
+; set right integers
+alloc i64v %3
+append 5 i64s %3
+append 3 i64s %3
+append 7 i64s %3
+append 4 i64s %3
+append 9 i64s %3
+append 4 i64s %3
+append 2 i64s %3
+append 7 i64s %3
+append 4 i64s %3
+append 1 i64s %3
+member %0 1 %4
+assign %3 i64v %4
+
+; set left strings
+@6 = "Z"
+alloc Sv %5
+append @3 Ss %5
+append @4 Ss %5
+append @6 Ss %5
+member %10 0 %6
+assign %5 Sv %6
+
+; set left integers
+alloc i64v %7
+append 4 i64s %7
+append 2 i64s %7
+append 1 i64s %7
+member %10 1 %8
+assign %7 i64v %8
+
+; display tables
+repr %10 $0 %11
+write %11
+
+;;    
+;; E 4
+;; B 2
+;; Z 1
+
+repr %0 $0 %12
+write %12
+
+;;    
+;; C 5
+;; F 3
+;; D 7
+;; E 4
+;; E 9
+;; C 4
+;; B 2
+;; C 7
+;; F 4
+;; V 1
+
+; match tables and print indices
+eqmatch $0 %10 %0 %20 %21
+repr %20 i64v %22
+write %22
+
+;;[0, 1, 2]
+
+repr %21 i64v %23
+write %23
+
+;;[3, 6, -1]

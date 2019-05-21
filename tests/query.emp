@@ -1,0 +1,6 @@
+let prices = load$("sample_csv/prices.csv")
+
+let df = from prices select mid=(low+high)/2.0 where symbol == "BRK.B"
+
+print(df.mid)
+##[163.575, 163.785, 163.16, 163.22, 162.635, 162.075, 161.74, 161.235, 162.32, 160.65]

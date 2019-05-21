@@ -1,0 +1,12 @@
+#pragma once
+
+#cmakedefine EMPIRICAL_VERSION "@EMPIRICAL_VERSION@"
+
+#ifndef EMPIRICAL_VERSION
+#define EMPIRICAL_VERSION "???"
+#endif
+
+#cmakedefine APPLE
+#cmakedefine LINUX
+#cmakedefine WIN32
+
