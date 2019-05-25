@@ -996,7 +996,8 @@ def main(output_directory):
     auto_gen_msg = common_msg % argv0
 
     # run through all headers
-    os.makedirs(output_directory, exist_ok=True)
+    if not os.path.exists(output_directory):
+        os.makedirs(output_directory)
     c = ChainOfWriters(auto_gen_msg, output_directory)
     c.run(TypesWriter('types.h'),
           OpcodesWriter('opcodes.h'),
