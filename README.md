@@ -46,6 +46,8 @@ While the actual code is all C++, there are code generators that need the JVM ([
 
 The build is statically linked, so no libraries are needed to distribute the resulting binary.
 
+[![Build status](https://ci.appveyor.com/api/projects/status/t0l0fewb96t82bup?svg=true)](https://ci.appveyor.com/project/chrisaycock/empirical-lang)
+
 ## Structure
 
 The code for Empirical is structured as follows:
