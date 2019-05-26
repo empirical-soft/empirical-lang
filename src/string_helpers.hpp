@@ -29,6 +29,12 @@ bool ends_with(const std::string& left, const std::string& right) {
   return false;
 }
 
+std::string trim(std::string str) {
+  size_t start = str.find_first_not_of(" \t\n");
+  size_t end = str.find_last_not_of(" \t\n");
+  return str.substr(start, end - start + 1);
+}
+
 // contains pair of testable input and expected output
 struct TestPair {
   std::string in;

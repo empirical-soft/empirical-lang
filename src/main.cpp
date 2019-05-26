@@ -8,6 +8,7 @@
  *
  */
 
+#include <cstdlib>
 #include <iostream>
 #include <unordered_map>
 
@@ -45,6 +46,10 @@ std::string eval_asm(const std::string& text, bool dump_vvm = false) {
 
 // read an entire file's contents
 std::string read_file(std::string filename) {
+  filename = trim(filename);
+  if (starts_with(filename, "~")) {
+    filename = std::getenv("HOME") + filename.erase(0, 1);
+  }
   std::ifstream file(filename);
   if (!file) {
     throw std::runtime_error("Error: unable to read " + filename);
