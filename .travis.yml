@@ -12,12 +12,12 @@ matrix:
           sources:
             - ubuntu-toolchain-r-test
           packages:
-            - g++-7
+            - g++-9
             - pkg-config
             - uuid-dev
       env:
-        - CC=gcc-7
-        - CXX=g++-7
+        - CC=gcc-9
+        - CXX=g++-9
 
 script:
   - make prod
