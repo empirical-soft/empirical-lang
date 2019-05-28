@@ -16,8 +16,10 @@ matrix:
             - pkg-config
             - uuid-dev
       env:
-        - CC=gcc-9
-        - CXX=g++-9
+        - EVAL="CC=gcc-9 && CXX=g++-9"
+
+before_install:
+  - eval "${EVAL}"
 
 script:
   - make prod
