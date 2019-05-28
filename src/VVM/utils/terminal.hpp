@@ -20,6 +20,8 @@
 #include <libgen.h>
 #endif  // WIN32
 
+extern bool testing_mode;
+
 /**
  * Returns the number of rows and columns in terminal
  */
@@ -27,6 +29,11 @@ void get_terminal_size(size_t& rows_out, size_t& cols_out) {
   // default settings
   rows_out = 25;
   cols_out = 80;
+
+  // continuous integration may have inconsistent window sizes
+  if (testing_mode) {
+    return;
+  }
 
 #ifdef WIN32
   // attempt to query console screen buffer via standard handles
