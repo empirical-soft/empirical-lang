@@ -1,0 +1,24 @@
+sudo: true
+
+language: cpp
+
+matrix:
+  include:
+    - os: linux
+      dist: xenial
+      python: "3.7"
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-7
+            - pkg_config
+            - uuid_dev
+      env:
+        - CC=gcc-7
+        - CXX=g++-7
+
+script:
+  - make prod
+  - make test
