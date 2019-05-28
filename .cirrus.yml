@@ -1,6 +1,6 @@
 linux_task:
   container:
-    image: ubuntu-1804-lts
+    image: gcc:latest
     cpu: 8
     memory: 8G
   prep_script: ./scripts/prep_ubuntu.sh
