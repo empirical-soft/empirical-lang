@@ -12,6 +12,10 @@ add_test(NAME test_ops
          COMMAND ${CMAKE_BINARY_DIR}/${EXECUTABLE} --verify-markdown ops.md
          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
+add_test(NAME test_err
+         COMMAND ${CMAKE_BINARY_DIR}/${EXECUTABLE} --verify-markdown err.md
+         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
 # TODO need a Windows version of the test script
 if(NOT WIN32)
 add_test(NAME test_emp
