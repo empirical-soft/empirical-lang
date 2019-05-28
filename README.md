@@ -1,8 +1,8 @@
 <p align="center"><img src="https://www.empirical-soft.com/logo.png"></p>
 
 <p align="center">
-	<a href="https://www.gnu.org/licenses/agpl-3.0.en.html"><img src="https://img.shields.io/badge/License-AGPL%20v3-blue.svg" alt="Affero General Public License (AGPL) with the Commons Clause"></a>
-	<a href="https://ci.appveyor.com/project/chrisaycock/empirical-lang"><img src="https://ci.appveyor.com/api/projects/status/t0l0fewb96t82bup?svg=true" alt="Build Status"></a>
+<a href="https://ci.appveyor.com/project/chrisaycock/empirical-lang"><img src="https://ci.appveyor.com/api/projects/status/t0l0fewb96t82bup?svg=true" alt="Build Status"></a>
+<a href="https://travis-ci.com/chrisaycock/empirical-lang"><img src="https://travis-ci.com/chrisaycock/empirical-lang.svg?branch=master" alt="Build Status"></a>
 </p>
 
 ## About Empirical
@@ -54,8 +54,6 @@ Additionally, POSIX has `make website`.
 While the actual code is all C++, there are code generators that need the JVM ([ANTLR](https://www.antlr.org)) and Python ([ASDL](https://github.com/empirical-soft/asdl4cpp)). These generators are included in this repo, so there is nothing to download.
 
 The build is statically linked, so no libraries are needed to distribute the resulting binary.
-
-[![Build status](https://ci.appveyor.com/api/projects/status/t0l0fewb96t82bup?svg=true)](https://ci.appveyor.com/project/chrisaycock/empirical-lang)
 
 ## Structure
 
