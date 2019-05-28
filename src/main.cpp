@@ -138,22 +138,22 @@ Options:
           std::string contents;
           try {
             contents = read_file(line.substr(3));
+            eval(contents, false, dump_ast, dump_hir, dump_vvm);
           }
           catch (std::exception& e) {
             std::cerr << e.what() << std::endl;
           }
-          eval(contents, false, dump_ast, dump_hir, dump_vvm);
           line.clear();
         }
         else if (starts_with(line, "load ", 1)) {
           std::string contents;
           try {
             contents = read_file(line.substr(6));
+            eval(contents, false, dump_ast, dump_hir, dump_vvm);
           }
           catch (std::exception& e) {
             std::cerr << e.what() << std::endl;
           }
-          eval(contents, false, dump_ast, dump_hir, dump_vvm);
           line.clear();
         }
         else if (starts_with(line, "multiline", 1)) {
@@ -175,20 +175,24 @@ Options:
         }
       }
 
-      // eval and print
-      try {
-        VVM::Timer timer;
-        std::string res = eval(line, true, dump_ast, dump_hir, dump_vvm);
-        std::cout << res << std::endl;
-        if (!res.empty()) {
-          std::cout << std::endl;
+      if (line != "") {
+        // eval and print
+        try {
+          VVM::Timer timer;
+          std::string res = eval(line, true, dump_ast, dump_hir, dump_vvm);
+          std::cout << res << std::endl;
+          if (!res.empty()) {
+            std::cout << std::endl;
+          }
+          if (timer_desired) {
+            timer.check("", "ms");
+          }
         }
-        if (timer_desired) {
-          timer.check("", "ms");
+        catch (std::exception& e) {
+          std::cerr << e.what() << std::endl;
         }
-      }
-      catch (std::exception& e) {
-        std::cerr << e.what() << std::endl;
+      } else {
+        std::cout << std::endl;
       }
     }
   }
