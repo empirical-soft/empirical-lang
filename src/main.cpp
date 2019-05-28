@@ -70,6 +70,9 @@ std::string read_multiline() {
   return result;
 }
 
+// global variable needed for certain quirks in regression tests
+bool testing_mode;
+
 // main function is the driver for getting user input and calling eval()
 int main(int argc, char* argv[]) {
   // docopt argument parsing
@@ -105,6 +108,7 @@ Options:
                         args["--verify-markdown"].asString() : "";
   std::string filename = args["<file>"] ? args["<file>"].asString() : "";
 
+  testing_mode = false;
   int ret_code = 0;
   if (filename.empty() && md_file.empty()) {
     // interactive mode
@@ -189,6 +193,7 @@ Options:
   }
   else if (!md_file.empty()) {
     // verify mode
+    testing_mode = true;
     Tests tests;
     try {
       std::string contents = read_file(md_file);
