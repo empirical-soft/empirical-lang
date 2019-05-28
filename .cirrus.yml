@@ -3,6 +3,5 @@ linux_task:
     image: gcc:latest
     cpu: 8
     memory: 8G
-  prep_script: ./scripts/prep_ubuntu.sh
   build_script: make prod
   test_script: make test
