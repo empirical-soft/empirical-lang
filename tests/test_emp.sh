@@ -6,7 +6,7 @@
 ret=0
 for f in *.emp
 do
-  result=$(diff <($1 $f) <(grep "##" $f | sed "s/##//"))
+  result=$(diff <($1 --test-mode $f) <(grep "##" $f | sed "s/##//"))
   if [[ $? -ne 0 ]]
   then
     echo $f

@@ -80,7 +80,7 @@ int main(int argc, char* argv[]) {
 R"(Empirical programming language
 
 Usage:
-  empirical [--dump-ast] [--dump-hir] [--dump-vvm] [<file>]
+  empirical [--dump-ast] [--dump-hir] [--dump-vvm] [--test-mode] [<file>]
   empirical --verify-markdown <file>
   empirical -v | --version
   empirical -h | --help
@@ -91,6 +91,7 @@ Options:
   --dump-ast                Print abstract syntax tree
   --dump-hir                Print high-level IR
   --dump-vvm                Print Vector Virtual Machine asm
+  --test-mode               Indicates regression tests
   --verify-markdown=<file>  Test code segments in file
 )";
 
@@ -108,7 +109,7 @@ Options:
                         args["--verify-markdown"].asString() : "";
   std::string filename = args["<file>"] ? args["<file>"].asString() : "";
 
-  testing_mode = false;
+  testing_mode = args["--test-mode"].asBool();
   int ret_code = 0;
   if (filename.empty() && md_file.empty()) {
     // interactive mode

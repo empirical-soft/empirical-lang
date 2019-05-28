@@ -1,3 +1,12 @@
+<p align="center"><img src="https://www.empirical-soft.com/logo.png"></p>
+
+<p align="center">
+<a href="https://ci.appveyor.com/project/chrisaycock/empirical-lang"><img src="https://ci.appveyor.com/api/projects/status/t0l0fewb96t82bup?svg=true" alt="Build Status"></a>
+<a href="https://travis-ci.com/chrisaycock/empirical-lang"><img src="https://travis-ci.com/chrisaycock/empirical-lang.svg?branch=master" alt="Build Status"></a>
+</p>
+
+## About Empirical
+
 [Empirical](https://www.empirical-soft.com/) is a language for time-series analysis. It has statically typed Dataframes with integrated queries and builtin timestamps.
 
 ## Examples
@@ -28,7 +37,7 @@ Get the closest event within three seconds:
 
 See the [website](https://www.empirical-soft.com/) for more examples and full documentation.
 
-## Building
+## Building Empirical
 
 The build is handled by CMake. There are some scripts to help with the process, both for POSIX (`*.sh`) and Windows (`*.bat`). These can be called by `make` or `make.bat` for an easy workflow.
 
@@ -45,8 +54,6 @@ Additionally, POSIX has `make website`.
 While the actual code is all C++, there are code generators that need the JVM ([ANTLR](https://www.antlr.org)) and Python ([ASDL](https://github.com/empirical-soft/asdl4cpp)). These generators are included in this repo, so there is nothing to download.
 
 The build is statically linked, so no libraries are needed to distribute the resulting binary.
-
-[![Build status](https://ci.appveyor.com/api/projects/status/t0l0fewb96t82bup?svg=true)](https://ci.appveyor.com/project/chrisaycock/empirical-lang) [![Build Status](https://travis-ci.com/chrisaycock/empirical-lang.svg?branch=master)](https://travis-ci.com/chrisaycock/empirical-lang)
 
 ## Structure
 
