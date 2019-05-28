@@ -139,7 +139,7 @@ def _make_opcodes():
 
     # binary operators -- integer
     operators = [('bitand', '&'), ('bitor', '|'), ('lshift', '<<'),
-                 ('rshift', '>>')]
+                 ('rshift', '>>'), ('mod', '%')]
     patterns = ['(%s,%s)->%s',     '(%s,[%s])->[%s]',
                 '([%s],%s)->[%s]', '([%s],[%s])->[%s]']
     for k, v in operators:

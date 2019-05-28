@@ -136,11 +136,11 @@ expr : FROM table=expr qt=(SELECT|EXEC) (cols=nexpr_list)?
      | SORT table=expr BY by=nexpr_list                       # SortExpr
      | JOIN left=expr ',' right=expr param=join_params*       # JoinExpr
      | op=('+'|'-') operand=expr                              # UnOpExpr
-     | left=expr op=('*'|'/') right=expr                      # BinOpExpr
+     | left=expr op=('*'|'/'|'%') right=expr                  # BinOpExpr
      | left=expr op=('+'|'-') right=expr                      # BinOpExpr
      | left=expr op=('<<'|'>>') right=expr                    # BinOpExpr
-     | left=expr ('&') right=expr                             # BinOpExpr
-     | left=expr ('|') right=expr                             # BinOpExpr
+     | left=expr op='&' right=expr                            # BinOpExpr
+     | left=expr op='|' right=expr                            # BinOpExpr
      | left=expr op=('<'|'>'|'=='|'<='|'>='|'!=') right=expr  # BinOpExpr
      | op=NOT operand=expr                                    # UnOpExpr
      | left=expr op=OR right=expr                             # BinOpExpr
@@ -249,7 +249,7 @@ ARROW : '->';
 
 
 /* operators */
-oper : '(' op=('+'|'-'|'*'|'/'|'<<'|'>>'|'&'|'|'|
+oper : '(' op=('+'|'-'|'*'|'/'|'%'|'<<'|'>>'|'&'|'|'|
                AND|OR|NOT|
                '<'|'>'|'=='|'<='|'>='|'!=') ')';
 
