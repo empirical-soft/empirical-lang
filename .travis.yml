@@ -17,6 +17,11 @@ matrix:
             - uuid-dev
       env:
         - EVAL="CC=gcc-9 && CXX=g++-9"
+    - os: osx
+      osx_image: xcode10.2
+      python: "3.7"
+      env:
+        - EVAL=""
 
 before_install:
   - eval "${EVAL}"
