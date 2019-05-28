@@ -1,3 +1,12 @@
+<p align="center"><img src="https://www.empirical-soft.com/logo.png"></p>
+
+<p align="center">
+	<a href="https://www.gnu.org/licenses/agpl-3.0.en.html"><img src="https://img.shields.io/badge/License-AGPL%20v3-blue.svg" alt="Affero General Public License (AGPL) with the Commons Clause"></a>
+	<a href="https://ci.appveyor.com/project/chrisaycock/empirical-lang"><img src="https://ci.appveyor.com/api/projects/status/t0l0fewb96t82bup?svg=true" alt="Build Status"></a>
+</p>
+
+## About Empirical
+
 [Empirical](https://www.empirical-soft.com/) is a language for time-series analysis. It has statically typed Dataframes with integrated queries and builtin timestamps.
 
 ## Examples
@@ -28,7 +37,7 @@ Get the closest event within three seconds:
 
 See the [website](https://www.empirical-soft.com/) for more examples and full documentation.
 
-## Building
+## Building Empirical
 
 The build is handled by CMake. There are some scripts to help with the process, both for POSIX (`*.sh`) and Windows (`*.bat`). These can be called by `make` or `make.bat` for an easy workflow.
 
