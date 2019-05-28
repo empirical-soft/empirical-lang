@@ -13,8 +13,8 @@ matrix:
             - ubuntu-toolchain-r-test
           packages:
             - g++-7
-            - pkg_config
-            - uuid_dev
+            - pkg-config
+            - uuid-dev
       env:
         - CC=gcc-7
         - CXX=g++-7
