@@ -26,6 +26,12 @@ These messages should be improved.
 >>> from prices select where symbol == "AAPL", volume > 30000000
 Error: unable to parse
 
+>>> 1 +
+Error: unable to parse
+
+>>> (
+Error: unable to parse
+
 ```
 
 ### Type errors
