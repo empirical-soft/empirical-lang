@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Update my GitHub repo; optionally remove a branch
 

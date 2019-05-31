@@ -17,11 +17,13 @@ matrix:
             - uuid-dev
       env:
         - EVAL="CC=gcc-9 && CXX=g++-9"
+        - OSNAME="linux"
     - os: osx
       osx_image: xcode10.2
       python: "3.7"
       env:
         - EVAL=""
+        - OSNAME="mac"
 
 before_install:
   - eval "${EVAL}"
@@ -29,3 +31,14 @@ before_install:
 script:
   - make prod
   - make test
+  - make deploy
+
+deploy:
+  provider: releases
+  api_key:
+    secure: "Gvb6qNYT6/stkcy5VysDcKIE+z6M0cYBZ6E4YkqdanIk3Law6SwV/Ncy7QY3v24h7oob7xUXJCka16mVe2GPxe8s6ZlZi5pnWX0EZ21TU9ZJ7RRvq+tILLiL05EyuSzWc/elZ22obsDgaixYVTkJ1lMSDTgbYkvE3byN7INX07U4oFoxrZGkiKF/UeU4duS0UUe56EEMQxj3vvmpc8YwwCdmIlK3a7/NhhGXC2gJ6HvsUlrZyhl74msqpc7o6gqb3HWRjNjNhuJj0s8C+YbthkjS+zUVZFR9Dbvm+md5eWUd+wU8sHkQi1PPUaFKGP1iR2ekn0K8vJi2SvwlcUUeoOpFmrj2DrTh2kCQQxNZhByd9Py0VM2sEt6iFKxDcEeJODNZI8IZjOxq5jGCFflTi5AuR56NyF+B1Yauw4E6M7QrYOsc0j6CRYAKRmPSgoL7GGPIujy7fNHgML6fMrNrY86Elkoenyl6MjHh0Yt5UxcuSwprU9qBJ+9Sh4eq7dqzqjQANx4LQNaElRLqcPN4MNUMXq+4wFkTCuwlFGdYu+luqxspKJarhob9QoeCjU5T3Y2BJiIqtAgk85P2jl/IN+uupOZxJTBb69X/VIPqvqN0R9kITmytuKwNTTj76vgiNwHs0jUsbu89AExVxLFPEVSav+DdysLqduNs7tylxD0="
+  file: "${OSNAME}.zip"
+  skip_cleanup: true
+  on:
+    branch: master
+    tags: true
