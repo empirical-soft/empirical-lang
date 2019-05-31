@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Generate changelog for web repo
 # (We need the sed because Git replaces '\n' with ' ' for subject fields.)

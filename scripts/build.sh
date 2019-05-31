@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Build Empirical, possibly with "prod" or "infer" directives
 
