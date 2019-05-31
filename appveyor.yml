@@ -21,11 +21,10 @@ artifacts:
   - path: windows.zip
 
 deploy:
-  description: 'Empirical'
+  description: Empirical
   provider: GitHub
   auth_token:
-    secure: GC/HoEoXxe2eQrh2NlrTtzGfFoiDNbhzrTp/w0eybbYXi/p4ZGLhtiNEMctEMfE9
+    secure: 3UPvcgYCDsEnJFSntDjs959TLXIDbaqk5QeJa+qaO/fd9h/aUcOuBzxyVPeUWMZZ
   artifact: windows.zip
   on:
-    branch: master
-    appveyor_repo_tag: true
+    APPVEYOR_REPO_TAG: true

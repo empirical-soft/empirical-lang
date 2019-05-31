@@ -12,11 +12,11 @@ matrix:
           sources:
             - ubuntu-toolchain-r-test
           packages:
-            - g++-9
+            - g++-8
             - pkg-config
             - uuid-dev
       env:
-        - EVAL="CC=gcc-9 && CXX=g++-9"
+        - EVAL="CC=gcc-8 && CXX=g++-8"
         - OSNAME="linux"
     - os: osx
       osx_image: xcode10.2
@@ -36,9 +36,9 @@ script:
 deploy:
   provider: releases
   api_key:
-    secure: "Gvb6qNYT6/stkcy5VysDcKIE+z6M0cYBZ6E4YkqdanIk3Law6SwV/Ncy7QY3v24h7oob7xUXJCka16mVe2GPxe8s6ZlZi5pnWX0EZ21TU9ZJ7RRvq+tILLiL05EyuSzWc/elZ22obsDgaixYVTkJ1lMSDTgbYkvE3byN7INX07U4oFoxrZGkiKF/UeU4duS0UUe56EEMQxj3vvmpc8YwwCdmIlK3a7/NhhGXC2gJ6HvsUlrZyhl74msqpc7o6gqb3HWRjNjNhuJj0s8C+YbthkjS+zUVZFR9Dbvm+md5eWUd+wU8sHkQi1PPUaFKGP1iR2ekn0K8vJi2SvwlcUUeoOpFmrj2DrTh2kCQQxNZhByd9Py0VM2sEt6iFKxDcEeJODNZI8IZjOxq5jGCFflTi5AuR56NyF+B1Yauw4E6M7QrYOsc0j6CRYAKRmPSgoL7GGPIujy7fNHgML6fMrNrY86Elkoenyl6MjHh0Yt5UxcuSwprU9qBJ+9Sh4eq7dqzqjQANx4LQNaElRLqcPN4MNUMXq+4wFkTCuwlFGdYu+luqxspKJarhob9QoeCjU5T3Y2BJiIqtAgk85P2jl/IN+uupOZxJTBb69X/VIPqvqN0R9kITmytuKwNTTj76vgiNwHs0jUsbu89AExVxLFPEVSav+DdysLqduNs7tylxD0="
+    # travis encrypt -r empirical-soft/empirical-lang --pro
+    secure: "QRySbvMgYELxj7gaarhgf92qn4Xx0n9jcbCXKp7h+vfrvVRvolJJoa/MOIe+yPxiDQySiwdYhK6ePg1sETDXgSzxNBFiQcYlQHA3LmQ3cHpFq+B4wugNuOYiuIMw3kLfPTB3I9apGWVavWmfSlEb3bOKszkd5mBjzESy3twsKiLFfisYCh75R5C+cOKTC1fh2ShIlki3/OyBPAhwytnrrzieVrwYRw6jYw4wlcHdQXKluW5smw/7Ew9mXdvJfIl/8mUPslJ0lE5dFf2hhWX+Y5LHpI3lOGlPyQZEBalaH6No6EJu5wK56vKbdunWVkkMvlPaU0J3UsimGy8L6Zo94lXa/sKKnFjfemrD0Ta8n5jJWHi4ZXiUEXuBR+GoaRQTr7g/wzX05LWY1CS7h76i18i/+kzeeSmgteUhJotd5U12CbISLl0TUZ4rNfnJjdxmt3h9kBZpzUBCVCYEkTfS0of+3u/L7xU17M+9vbUFVG3x6wr0thwe46Jw0LkA93hmX4gaDNaOt36VZhHwUl/NGXbahzHX39bO1Ka2LxmOdjlInthh5uNgRwHiGMFvlY+j9CTFvuG8MXdDcbablGy+f/djeqYJVNsc1A16bX7ljk7XCXgBehjlClmFjNsvtVPWtBoabpa08KKITc+x3L0G+RDWCj/XXfZizn7TpwDox1o="
   file: "${OSNAME}.zip"
   skip_cleanup: true
   on:
-    branch: master
     tags: true
