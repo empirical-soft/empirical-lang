@@ -12,11 +12,11 @@ matrix:
           sources:
             - ubuntu-toolchain-r-test
           packages:
-            - g++-9
+            - g++-8
             - pkg-config
             - uuid-dev
       env:
-        - EVAL="CC=gcc-9 && CXX=g++-9"
+        - EVAL="CC=gcc-8 && CXX=g++-8"
         - OSNAME="linux"
     - os: osx
       osx_image: xcode10.2
