@@ -8,6 +8,7 @@
  *
  */
 
+#include <cmath>
 #include <vector>
 #include <numeric>
 #include <iostream>
@@ -287,6 +288,18 @@ BINFUNC(bar,bar)
 UNOP(neg,-)
 UNOP(pos,+)
 UNOP(not,!)
+UNOP(sin,std::sin)
+UNOP(cos,std::cos)
+UNOP(tan,std::tan)
+UNOP(asin,std::asin)
+UNOP(acos,std::acos)
+UNOP(atan,std::atan)
+UNOP(sinh,std::sinh)
+UNOP(cosh,std::cosh)
+UNOP(tanh,std::tanh)
+UNOP(asinh,std::asinh)
+UNOP(acosh,std::acosh)
+UNOP(atanh,std::atanh)
 
 #undef UNOP
 #undef UNOP_V

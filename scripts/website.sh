@@ -12,3 +12,9 @@ cd doc
 cat tutorial_running.md tutorial_core.md | ../thirdparty/github-markdown-toc/gh-md-toc - | sed "s/^      //" > ../../website/_includes/tutorial_toc.md
 cp tutorial*.md ../../website/_includes/
 
+# Change release number for downloads
+
+RELEASE=$(git describe --always)
+sed -i~ "s/release: .*/release: $RELEASE/" ../website/download.md
+rm ../website/download.md~
+

@@ -182,6 +182,17 @@ def _make_opcodes():
             for t in arithmetic_types:
                 opcodes += [(v, k, p % (t, t), 2)]
 
+    # unary operators -- floating
+    operators = [('sin', 'sin'), ('cos', 'cos'), ('tan', 'tan'),
+                 ('asin', 'asin'), ('acos', 'acos'), ('atan', 'atan'),
+                 ('sinh', 'sinh'), ('cosh', 'cosh'), ('tanh', 'tanh'),
+                 ('asinh', 'asinh'), ('acosh', 'acosh'), ('atanh', 'atanh')]
+    patterns = ['%s->%s', '[%s]->[%s]']
+    for k, v in operators:
+        for p in patterns:
+            for t in float_types:
+                opcodes += [(v, k, p % (t, t), 2)]
+
     # reduce aggregators
     operators = [('sum', 'sum'), ('prod', 'prod')]
     for k, v in operators:
