@@ -1,7 +1,7 @@
 /*
  * Main -- driver for Empirical
  *
- * Copyright (C) 2019 Empirical Software Solutions, LLC
+ * Copyright (C) 2019--2020 Empirical Software Solutions, LLC
  *
  * This program is distributed under the terms of the GNU Affero General
  * Public License with the Commons Clause.
@@ -114,7 +114,7 @@ Options:
   if (filename.empty() && md_file.empty()) {
     // interactive mode
     std::cout << "Empirical version " << EMPIRICAL_VERSION << std::endl;
-    std::cout << "Copyright (C) 2019 Empirical Software Solutions, LLC"
+    std::cout << "Copyright (C) 2019--2020 Empirical Software Solutions, LLC"
               << std::endl << std::endl;
     Linenoise ln(argv[0]);
     std::string line;
