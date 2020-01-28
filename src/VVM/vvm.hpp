@@ -1,7 +1,7 @@
 /*
  * VVM -- core logic for the Vector Virtual Machine
  *
- * Copyright (C) 2019 Empirical Software Solutions, LLC
+ * Copyright (C) 2019--2020 Empirical Software Solutions, LLC
  *
  * This program is distributed under the terms of the GNU Affero General
  * Public License with the Commons Clause.
