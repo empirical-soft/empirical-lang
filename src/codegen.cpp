@@ -93,6 +93,7 @@ class CodegenVisitor : public HIR::BaseVisitor {
   // map a HIR node's address to VVM's register bank
   std::unordered_map<HIR::declaration_t, VVM::operand_t> reg_map_;
   std::unordered_map<HIR::FunctionDef_t, VVM::operand_t> func_map_;
+  std::unordered_map<HIR::expr_t, VVM::operand_t> implied_reg_map_;
   std::vector<size_t> last_operands_ = {0, 0, 0};
 
   // claim register space; map HIR node if necessary
@@ -376,11 +377,10 @@ class CodegenVisitor : public HIR::BaseVisitor {
 
   antlrcpp::Any visitQuery(HIR::Query_t node) override {
     VVM::operand_t table = visit(node->table);
+    implied_reg_map_[node->table] = table;
+
     // we might need to shadow the register temporarily
     VVM::operand_t orig_table = table;
-    HIR::Id_t id = dynamic_cast<HIR::Id_t>(node->table);
-    HIR::DeclRef_t ref = dynamic_cast<HIR::DeclRef_t>(id->ref);
-    HIR::declaration_t declaration = ref->ref;
 
     if (node->where) {
       VVM::operand_t where = visit(node->where);
@@ -388,7 +388,7 @@ class CodegenVisitor : public HIR::BaseVisitor {
       VVM::operand_t result = reserve_space();
       emit(VVM::opcodes::where, {table, where, typee, result});
       table = result;
-      reg_map_[declaration] = table;
+      implied_reg_map_[node->table] = table;
     }
 
     VVM::operand_t by_table;
@@ -433,7 +433,7 @@ class CodegenVisitor : public HIR::BaseVisitor {
         emit(VVM::opcodes::lt_i64s_i64s, {counter, length, cmp_result});
         emit_label(VVM::opcodes::bfalse, cmp_result, end);
         VVM::operand_t sub_table = reserve_space();
-        reg_map_[declaration] = sub_table;
+        implied_reg_map_[node->table] = sub_table;
         emit(VVM::opcodes::member, {groups, counter, sub_table});
         assign_opcode = VVM::opcodes::append;
         num_leading_cols = number_of_fields(node->by_type);
@@ -460,12 +460,13 @@ class CodegenVisitor : public HIR::BaseVisitor {
       table = result;
     }
 
-    reg_map_[declaration] = orig_table;
+    implied_reg_map_[node->table] = orig_table;
     return table;
   }
 
   antlrcpp::Any visitSort(HIR::Sort_t node) override {
     VVM::operand_t table = visit(node->table);
+    implied_reg_map_[node->table] = table;
     VVM::operand_t typee = get_type_operand(node->type);
 
     // put 'by' in its own table
@@ -493,7 +494,9 @@ class CodegenVisitor : public HIR::BaseVisitor {
 
   antlrcpp::Any visitJoin(HIR::Join_t node) override {
     VVM::operand_t left = visit(node->left);
+    implied_reg_map_[node->left] = left;
     VVM::operand_t right = visit(node->right);
+    implied_reg_map_[node->right] = right;
     VVM::operand_t left_typee = get_type_operand(node->left->type);
     VVM::operand_t right_typee = get_type_operand(node->right->type);
     VVM::operand_t right_remaining_typee =
@@ -771,16 +774,13 @@ class CodegenVisitor : public HIR::BaseVisitor {
   }
 
   antlrcpp::Any visitMember(HIR::Member_t node) override {
-    VVM::operand_t source = 0;
-    if (node->value->expr_kind == HIR::expr_::ExprKind::kId) {
-      HIR::Id_t id = dynamic_cast<HIR::Id_t>(node->value);
-      HIR::DeclRef_t ref = dynamic_cast<HIR::DeclRef_t>(id->ref);
-      HIR::declaration_t declaration = ref->ref;
-      source = reg_map_[declaration];
-    }
-    else {
-      nyi("Member from non-id value");
-    }
+    // implied members should have saved the source's register already
+    auto iter = implied_reg_map_.find(node->value);
+    VVM::operand_t source = (iter != implied_reg_map_.end())
+                              ? iter->second
+                              : VVM::operand_t(visit(node->value));
+
+    // declaration's offset was recorded by Sema
     VVM::operand_t offset = 0;
     if (node->ref->resolved_kind == HIR::resolved_::ResolvedKind::kDeclRef) {
       HIR::DeclRef_t ref = dynamic_cast<HIR::DeclRef_t>(node->ref);
@@ -791,6 +791,8 @@ class CodegenVisitor : public HIR::BaseVisitor {
     else {
       nyi("Member on non-declaration");
     }
+
+    // simply invoke the opcode
     VVM::operand_t destination = reserve_space();
     emit(VVM::opcodes::member, {source, offset, destination});
     return destination;

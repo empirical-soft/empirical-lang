@@ -117,6 +117,7 @@ Options:
     std::cout << "Copyright (C) 2019--2020 Empirical Software Solutions, LLC"
               << std::endl << std::endl;
     Linenoise ln(argv[0]);
+    //ln.disable();
     std::string line;
     while (ln.get_line(line)) {
       if (line == "quit" || line == "exit") {
