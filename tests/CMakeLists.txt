@@ -4,6 +4,10 @@ else(WIN32)
     set(EXECUTABLE empirical)
 endif(WIN32)
 
+add_test(NAME test_sort
+         COMMAND ${CMAKE_BINARY_DIR}/${EXECUTABLE} --verify-markdown sort.md
+         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
 add_test(NAME test_joins
          COMMAND ${CMAKE_BINARY_DIR}/${EXECUTABLE} --verify-markdown joins.md
          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})

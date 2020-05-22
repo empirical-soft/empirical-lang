@@ -153,7 +153,7 @@ class SemaVisitor : public AST::BaseVisitor {
   // return array of pointers to HIR nodes where symbol was declared
   Scope::Resolveds find_symbol(const std::string& symbol,
                                bool* in_preferred = nullptr) {
-    // check the preferred scope first
+    // check the preferred scope first (query/sort/join have implied members)
     if (preferred_scope_ != nullptr) {
       size_t idx = get_scope(preferred_scope_->type);
       Scope::Resolveds initial = find_symbol_in_scope(symbol, idx);

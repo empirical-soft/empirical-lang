@@ -1,8 +1,8 @@
-This is an extension of the regression tests from `doc/tutorial_running.md`.
+This is an extension of the regression tests from `doc/tutorial_core.md`.
 
 ### Preparation
 
-Most of this comes from `doc/tutorial_running.md`.
+Most of this comes from `doc/tutorial_core.md`.
 
 ```
 >>> let prices = load$("sample_csv/small_prices.csv")
