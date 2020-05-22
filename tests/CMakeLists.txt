@@ -12,6 +12,10 @@ add_test(NAME test_joins
          COMMAND ${CMAKE_BINARY_DIR}/${EXECUTABLE} --verify-markdown joins.md
          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
+add_test(NAME test_time
+         COMMAND ${CMAKE_BINARY_DIR}/${EXECUTABLE} --verify-markdown time.md
+         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
 add_test(NAME test_ops
          COMMAND ${CMAKE_BINARY_DIR}/${EXECUTABLE} --verify-markdown ops.md
          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})

@@ -28,14 +28,14 @@
 
 #include <time.h>
 
-/* assumes a Julian calendar, so works from 1970 to 2099 */
+/* assumes a Julian calendar, so works from 1901 to 2099 */
 
 time_t fast_timegm(struct tm *timeptr) {
   static const int month_days [] =
     {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
   int years = timeptr->tm_year - 70;
-  int days_to_year = (years * 365) + ((years + 2) / 4);
+  int days_to_year = years * 365;
 
   int days_to_month = 0;
   for (int i = 0; i < timeptr->tm_mon; i++) {
@@ -44,12 +44,23 @@ time_t fast_timegm(struct tm *timeptr) {
 
   int days_in_month = timeptr->tm_mday - 1;
 
-  int total_days = days_to_year + days_to_month + days_in_month;
-
-  /* if this is a leap year, but we haven't hit March yet */
-  if (((years + 2) % 4) == 0 && (timeptr->tm_mon <= 1)) {
-    total_days--;
+  int leap_days = 0;
+  if (years >= 0) {
+    leap_days = (years + 2) / 4;
+    /* if this is a leap year, but we haven't hit March yet */
+    if (((years + 2) % 4) == 0 && (timeptr->tm_mon <= 1)) {
+      leap_days--;
+    }
   }
+  else {
+    leap_days = (years - 2) / 4;
+    /* if this is a leap year, but we have passed March */
+    if (((years - 2) % 4) == 0 && (timeptr->tm_mon > 1)) {
+      leap_days++;
+    }
+  }
+
+  int total_days = days_to_year + days_to_month + days_in_month + leap_days;
 
   return (total_days * 86400) + (timeptr->tm_hour * 3600) +
          (timeptr->tm_min * 60) + timeptr->tm_sec;
