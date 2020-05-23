@@ -45,6 +45,8 @@ char* istrtime(const char *str, char *format_buffer, size_t maxlen);
 
 time_t fast_timegm(struct tm *timeptr);
 
+void fast_gmtime(const time_t *clock, struct tm *timeptr);
+
 #ifdef __cplusplus
 }
 #endif
