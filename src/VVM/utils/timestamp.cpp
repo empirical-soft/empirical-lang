@@ -86,11 +86,7 @@ std::string nanos_to_string(int64_t value, const std::string& format) {
   int nanos = value % ns_per_sec;
   tm time;
   memset(&time, 0, sizeof(tm));
-#ifdef WIN32
-  gmtime_s(&time, &clock);
-#else  // WIN32
-  gmtime_r(&clock, &time);
-#endif  // WIN32
+  fast_gmtime(&clock, &time);
   char buffer[80];
   ::strftime_ns(buffer, sizeof(buffer), format.c_str(), &time, nanos);
   return buffer;

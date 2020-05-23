@@ -28,10 +28,14 @@
 
 #include <time.h>
 
+#define SECS_PER_DAY    86400
+#define SECS_PER_HOUR    3600
+#define SECS_PER_MINUTE    60
+
 /* assumes a Julian calendar, so works from 1901 to 2099 */
 
 time_t fast_timegm(struct tm *timeptr) {
-  static const int month_days [] =
+  static const int month_days[] =
     {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
   int years = timeptr->tm_year - 70;
@@ -62,7 +66,66 @@ time_t fast_timegm(struct tm *timeptr) {
 
   int total_days = days_to_year + days_to_month + days_in_month + leap_days;
 
-  return (total_days * 86400) + (timeptr->tm_hour * 3600) +
-         (timeptr->tm_min * 60) + timeptr->tm_sec;
+  return (total_days * SECS_PER_DAY) +
+         (timeptr->tm_hour * SECS_PER_HOUR) +
+         (timeptr->tm_min * SECS_PER_MINUTE) +
+          timeptr->tm_sec;
+}
+
+/* division that rounds down for negatives */
+static time_t div(time_t a, time_t b) {
+  return (a / b - (a % b < 0));
+}
+
+static time_t leaps_passed(time_t year) {
+  return div(year, 4) - div(year, 100) + div(year, 400);
+}
+
+static int is_leap(time_t year) {
+  return (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0));
+}
+
+void fast_gmtime(const time_t *clock, struct tm *timeptr) {
+  static const time_t month_days[2][13] = {
+    {0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365},
+    {0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366}
+  };
+
+  time_t time = *clock;
+
+  time_t total_days = time / SECS_PER_DAY;
+  time_t secs_in_day = time % SECS_PER_DAY;
+  while (secs_in_day < 0) {
+    secs_in_day += SECS_PER_DAY;
+    total_days--;
+  }
+
+  timeptr->tm_hour = secs_in_day / SECS_PER_HOUR;
+  time_t secs_in_hour = secs_in_day % SECS_PER_HOUR;
+
+  timeptr->tm_min = secs_in_hour / SECS_PER_MINUTE;
+  time_t secs_in_minute = secs_in_hour % SECS_PER_MINUTE;
+
+  timeptr->tm_sec = secs_in_minute;
+
+  /* iteratively guess the year and adjust */
+  time_t year = 1970;
+  time_t days_in_year = total_days;
+  while (days_in_year < 0 || days_in_year >= (is_leap(year) ? 366 : 365)) {
+    time_t guess = year + div(days_in_year, 365);
+    days_in_year -= ((guess - year) * 365
+                  + leaps_passed(guess - 1)
+                  - leaps_passed(year - 1));
+    year = guess;
+  }
+  timeptr->tm_year = year - 1900;
+
+  /* determine month and day */
+  const time_t *md = month_days[is_leap(year)];
+  time_t month;
+  for (month = 0; days_in_year >= md[month+1]; month++)
+    ;
+  timeptr->tm_mon = month;
+  timeptr->tm_mday = 1 + days_in_year - md[month];
 }
 
