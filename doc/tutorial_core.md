@@ -137,7 +137,7 @@ Users can define their own values.
 ```
 >>> data Person: name: String, age: Int64 end
 
->>> let p = Person("Alice", 37)
+>>> var p = Person("Alice", 37)
 
 ```
 
@@ -173,6 +173,33 @@ Prepending a user-defined type with a bang (`!`) changes the type to a Dataframe
   name age
  Alice  37
    Bob  39
+
+```
+
+We can always recall the type of an expression.
+
+```
+>>> type_of(x)
+Int64
+
+>>> type_of(x > 7)
+Bool
+
+>>> var y: type_of(x)
+
+>>> y = 7
+
+>>> type_of(Int64)
+Kind(Int64)
+
+>>> Int64
+<type: Int64>
+
+>>> type_of(p)
+Person
+
+>>> Person
+<type: Person>
 
 ```
 
@@ -220,6 +247,17 @@ Arrays of consecutive integers can be created from `range()`.
 ```
 >>> range(100)
 [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, ...]
+
+```
+
+The type can be recalled.
+
+```
+>>> type_of(xs)
+[Float64]
+
+>>> [Float64]
+<type: [Float64]>
 
 ```
 
@@ -316,6 +354,26 @@ User-defined literals can be defined by prepending `suffix` to any function name
 
 >>> 1.2e4_z
 36000.0
+
+```
+
+A function's type information is available as well.
+
+```
+>>> add3
+<func: add3>
+
+>>> type_of(add3)
+(Int64, Int64, Int64) -> Int64
+
+>>> (+)
+<func: (+)>
+
+>>> type_of(sum)
+overloaded:
+  ([Int64]) -> Int64
+  ([Float64]) -> Float64
+  ([String]) -> String
 
 ```
 
@@ -485,6 +543,18 @@ Dataframes are just values. They can be assigned to a variable, for example.
 
 ```
 >>> let prices = load$("prices.csv")
+
+>>> type_of(prices)
+!Provider$prices.csv
+
+>>> columns(prices)
+symbol: String
+date: Date
+open: Float64
+high: Float64
+low: Float64
+close: Float64
+volume: Int64
 
 ```
 

@@ -34,6 +34,8 @@ module HIR
        | BinOp(expr left, identifier op, expr right, resolved ref)
        | FunctionCall(expr func, expr* args)
        | TemplateInst(expr value, expr* args, stmt* resolutions)
+       | TypeOf(expr arg, string s)
+       | Columns(expr arg, string s)
        | Member(expr value, identifier member, resolved ref)
        | Subscript(expr value, slice slice)
        | UserDefinedLiteral(expr literal, identifier suffix, resolved ref)
@@ -78,4 +80,5 @@ module HIR
            | VVMOpRef(size_t opcode, datatype type)
            | VVMTypeRef(size_t t)
            | CompilerRef(size_t code, datatype type)
+           | SemaRef(size_t code, datatype type)
 }
