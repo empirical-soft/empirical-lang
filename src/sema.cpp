@@ -70,6 +70,10 @@ class SemaVisitor : public AST::BaseVisitor {
         HIR::CompilerRef_t ptr = dynamic_cast<HIR::CompilerRef_t>(node);
         return ptr->type;
       }
+      case HIR::resolved_::ResolvedKind::kSemaRef: {
+        HIR::SemaRef_t ptr = dynamic_cast<HIR::SemaRef_t>(node);
+        return ptr->type;
+      }
     }
   }
 
@@ -754,7 +758,8 @@ class SemaVisitor : public AST::BaseVisitor {
   }
 
   // return a type definition string from datatype
-  std::string get_type_string(HIR::datatype_t node) {
+  std::string get_type_string(HIR::datatype_t node,
+                              const std::string& sep = ", ") {
     std::string result;
     HIR::DataDef_t dd = get_data_def(node);
     for (HIR::declaration_t d: dd->body) {
@@ -766,7 +771,7 @@ class SemaVisitor : public AST::BaseVisitor {
         result = new_item;
       }
       else {
-        result += ", " + new_item;
+        result += sep + new_item;
       }
     }
     return result;
@@ -811,8 +816,76 @@ class SemaVisitor : public AST::BaseVisitor {
 
   /* builtin items */
 
+  enum class SemaCodes: size_t {
+    kTypeOf,
+    kColumns
+  };
+
+  // try to internally invoke function; return nullptr if unable
+  HIR::expr_t attempt_sema_function(HIR::expr_t func,
+                                    std::vector<HIR::expr_t> args) {
+    if (func->expr_kind == HIR::expr_::ExprKind::kId) {
+      HIR::Id_t id = dynamic_cast<HIR::Id_t>(func);
+      if (id->ref != nullptr &&
+          id->ref->resolved_kind ==
+          HIR::resolved_::ResolvedKind::kSemaRef) {
+        HIR::SemaRef_t ptr = dynamic_cast<HIR::SemaRef_t>(id->ref);
+        SemaCodes code = SemaCodes(ptr->code);
+        switch (code) {
+          case SemaCodes::kTypeOf: {
+            return sema_function_type_of(args);
+          }
+          case SemaCodes::kColumns: {
+            return sema_function_columns(args);
+          }
+        }
+      }
+    }
+    return nullptr;
+  }
+
+  // type_of() function
+  HIR::expr_t sema_function_type_of(std::vector<HIR::expr_t> args) {
+    HIR::expr_t a = args[0];
+    HIR::datatype_t t = a->type;
+    std::string s = to_string(t);
+    // show types for all overloaded functions
+    if (is_overloaded(a)) {
+      HIR::OverloadedId_t id = dynamic_cast<HIR::OverloadedId_t>(a);
+      if (id->type->datatype_kind ==
+          HIR::datatype_::DatatypeKind::kFuncType) {
+        s = "overloaded:";
+        for (HIR::resolved_t ref: id->refs) {
+          s += "\n  " + to_string(get_type(ref));
+        }
+      }
+    }
+    return HIR::TypeOf(a, s, HIR::Kind(t), a->name);
+  }
+
+  // columns() function
+  HIR::expr_t sema_function_columns(std::vector<HIR::expr_t> args) {
+    HIR::expr_t a = args[0];
+    HIR::datatype_t t = a->type;
+    std::string s = "<none>";
+    if (is_kind_type(t)) {
+      t = get_underlying_type(t);
+    }
+    // only show members if this is a UDT
+    if (get_scope(t)) {
+      s = get_type_string(t, "\n");
+    }
+    return HIR::Columns(a, s, HIR::Void(), a->name);
+  }
+
   // save all builtin items so that id resolution will find them
   void save_builtins() {
+    store_symbol("type_of", HIR::SemaRef(size_t(SemaCodes::kTypeOf),
+      HIR::FuncType({nullptr}, HIR::Void())));
+
+    store_symbol("columns", HIR::SemaRef(size_t(SemaCodes::kColumns),
+      HIR::FuncType({nullptr}, HIR::Void())));
+
     store_symbol("store", HIR::CompilerRef(size_t(CompilerCodes::kStore),
       HIR::FuncType({nullptr, HIR::VVMType(size_t(VVM::vvm_types::Ss))},
                     HIR::Void())));
@@ -1487,6 +1560,12 @@ class SemaVisitor : public AST::BaseVisitor {
         sema_err_ << "Error: " << err_msg << std::endl;
       }
     }
+    // try to invoke function now internally
+    HIR::expr_t attempt = attempt_sema_function(func, args);
+    if (attempt != nullptr) {
+      return attempt;
+    }
+    // wrap everything together
     HIR::datatype_t rettype = get_rettype(func->type);
     std::string name = !args.empty() ? args[0]->name : func->name;
     return HIR::FunctionCall(func, args, rettype, name);
