@@ -66,6 +66,10 @@ The code for Empirical is structured as follows:
  - `scripts/` - build scripts
  - `thirdparty/` - open-source dependencies
 
+## Contributing
+
+See the [Contributor's Notes](CONTRIBUTING.md). There is also the [Maintainer's Notes](MAINTAINING.md) for the curious.
+
 ## License
 
 [Affero General Public License](https://www.gnu.org/licenses/agpl-3.0.en.html) (AGPL) with the [Commons Clause](https://commonsclause.com).

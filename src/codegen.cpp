@@ -162,12 +162,12 @@ class CodegenVisitor : public HIR::BaseVisitor {
     labeler_.append_dep(b, loc);
   }
 
-  size_t specialize_opcode(std::string opcode, HIR::datatype_t node) {
+  size_t specialize_opcode(const std::string& opcode, HIR::datatype_t node) {
     std::string opstr = opcode + '_' + get_vvm_type(node);
     return VVM::encode_opcode(opstr);
   }
 
-  size_t specialize_opcode(std::string opcode, HIR::datatype_t node1,
+  size_t specialize_opcode(const std::string& opcode, HIR::datatype_t node1,
                            HIR::datatype_t node2) {
     std::string opstr = opcode + '_' + get_vvm_type(node1) + '_' +
                         get_vvm_type(node2);

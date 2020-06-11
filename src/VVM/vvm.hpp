@@ -140,7 +140,7 @@ void* remove_tag(tagged_ptr_t ptr);
 std::string decode_ptr(tagged_ptr_t ptr);
 std::string disassemble(const const_pool_t& cp);
 
-size_t encode_opcode(std::string op);
+size_t encode_opcode(const std::string& op);
 std::string to_string(const Program& program);
 
 // defined in disassembler.h

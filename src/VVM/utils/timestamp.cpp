@@ -98,7 +98,7 @@ std::string nanos_to_string(int64_t nanos) {
 }
 
 // returns integer according to format
-int64_t nanos_from_string(const std::string& str, std::string format) {
+int64_t nanos_from_string(const std::string& str, const std::string& format) {
   static const int64_t ns_per_sec = 1000000000;
   tm time;
   memset(&time, 0, sizeof(tm));
