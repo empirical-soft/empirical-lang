@@ -33,7 +33,7 @@ std::string infer_strtime_format(const std::string& str);
 
 std::string nanos_to_string(int64_t value, const std::string& format);
 std::string nanos_to_string(int64_t nanos);
-int64_t nanos_from_string(const std::string& str, std::string format);
+int64_t nanos_from_string(const std::string& str, const std::string& format);
 int64_t nanos_from_string(const std::string& str);
 std::string delta_to_string(int64_t delta);
 int64_t delta_from_string(const std::string& str);

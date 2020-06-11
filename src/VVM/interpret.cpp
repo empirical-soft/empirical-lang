@@ -645,7 +645,7 @@ WRAPPER_V_S(count)
   /*** STORE ***/
 
   // store data to a file
-  void storer(type_t typee, operand_t src, std::string filename) {
+  void storer(type_t typee, operand_t src, const std::string& filename) {
     // check tag
     TypeMask mask = TypeMask(typee & 1);
     type_t num = typee >> 1;

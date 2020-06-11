@@ -18,5 +18,5 @@ while [ "$1" != "" ]; do
 done
 
 mkdir -p build && cd build
-cmake $prod ..
+cmake $prod -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ..
 $infer cmake --build . -- -j8

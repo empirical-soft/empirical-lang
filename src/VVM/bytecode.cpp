@@ -250,7 +250,7 @@ std::string disassemble(const const_pool_t& cp) {
 }
 
 // convert string version of opcode into numerical form
-size_t encode_opcode(std::string op) {
+size_t encode_opcode(const std::string& op) {
   // map of known codes
   static std::unordered_map<std::string, size_t> encoder_;
   if (encoder_.empty()) {

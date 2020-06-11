@@ -251,7 +251,7 @@ class SemaVisitor : public AST::BaseVisitor {
 
   // activate a new scope
   void push_scope() {
-    symbol_table_.push_back(Scope(current_scope_));
+    symbol_table_.emplace_back(current_scope_);
     current_scope_ = symbol_table_.size() - 1;
   }
 
@@ -407,7 +407,7 @@ class SemaVisitor : public AST::BaseVisitor {
   }
 
   // find scalar UDT for a Dataframe name (assumes leading '!')
-  HIR::DataDef_t get_underlying_udt(std::string name) {
+  HIR::DataDef_t get_underlying_udt(const std::string& name) {
     std::string underlying_name = name.c_str() + 1;
     Scope::Resolveds underlying_resolveds = find_symbol(underlying_name);
     if (underlying_resolveds.empty()) {
@@ -424,7 +424,7 @@ class SemaVisitor : public AST::BaseVisitor {
   }
 
   // attempt to make Dataframe with the given type name
-  HIR::datatype_t make_dataframe(std::string name) {
+  HIR::datatype_t make_dataframe(const std::string& name) {
     // find underlying data definition first
     HIR::DataDef_t node = get_underlying_udt(name);
     if (node == nullptr) {
@@ -739,7 +739,7 @@ class SemaVisitor : public AST::BaseVisitor {
   }
 
   // return a type definition string from aliases
-  std::string get_type_string(std::vector<HIR::alias_t> aliases) {
+  std::string get_type_string(const std::vector<HIR::alias_t>& aliases) {
     std::string result;
     for (HIR::alias_t a: aliases) {
       std::string name = a->name.empty() ? a->value->name : a->name;
@@ -823,7 +823,7 @@ class SemaVisitor : public AST::BaseVisitor {
 
   // try to internally invoke function; return nullptr if unable
   HIR::expr_t attempt_sema_function(HIR::expr_t func,
-                                    std::vector<HIR::expr_t> args) {
+                                    const std::vector<HIR::expr_t>& args) {
     if (func->expr_kind == HIR::expr_::ExprKind::kId) {
       HIR::Id_t id = dynamic_cast<HIR::Id_t>(func);
       if (id->ref != nullptr &&
