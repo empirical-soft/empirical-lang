@@ -54,7 +54,7 @@ def get_args(fields):
         ctype = get_c_type(f.type)
         if f.seq:
             ctype = "std::vector<%s>" % ctype
-        if ctype.startswith("std::"):
+        if ctype.startswith("std::") or ctype == "identifier":
             ctype = "const " + ctype + "&"
         args.append((ctype, name, f.opt or f.seq))
     return args
