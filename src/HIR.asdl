@@ -57,7 +57,7 @@ module HIR
   alias = (expr value, identifier? name)
 
   declaration = (identifier name, expr? explicit_type, expr? value,
-                 datatype type, size_t offset)
+                 decltype dt, datatype type, size_t offset)
 
   decltype = Let | Var
 
