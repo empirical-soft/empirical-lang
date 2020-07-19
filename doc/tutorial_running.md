@@ -4,7 +4,7 @@ Launch Empirical from the command line to get the REPL.
 
 ```
 $ path/to/empirical
-Empirical version 0.1.0
+Empirical version 0.4.2
 Copyright (C) 2019--2020 Empirical Software Solutions, LLC
 
 >>>

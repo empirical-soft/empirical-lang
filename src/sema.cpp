@@ -447,7 +447,7 @@ class SemaVisitor : public AST::BaseVisitor {
       push_scope();
       size_t scope = current_scope_;
       for (HIR::declaration_t b: node->body) {
-        auto d = HIR::declaration(b->name, nullptr, b->value,
+        auto d = HIR::declaration(b->name, nullptr, b->value, b->dt,
                                   HIR::Array(b->type), b->offset);
         store_symbol(b->name, HIR::DeclRef(d));
         body.push_back(d);
@@ -845,7 +845,7 @@ class SemaVisitor : public AST::BaseVisitor {
   }
 
   // type_of() function
-  HIR::expr_t sema_function_type_of(std::vector<HIR::expr_t> args) {
+  HIR::expr_t sema_function_type_of(const std::vector<HIR::expr_t>& args) {
     HIR::expr_t a = args[0];
     HIR::datatype_t t = a->type;
     std::string s = to_string(t);
@@ -864,7 +864,7 @@ class SemaVisitor : public AST::BaseVisitor {
   }
 
   // columns() function
-  HIR::expr_t sema_function_columns(std::vector<HIR::expr_t> args) {
+  HIR::expr_t sema_function_columns(const std::vector<HIR::expr_t>& args) {
     HIR::expr_t a = args[0];
     HIR::datatype_t t = a->type;
     std::string s = "<none>";
@@ -1128,7 +1128,9 @@ class SemaVisitor : public AST::BaseVisitor {
     HIR::decltype_t dt = visit(node->dt);
     std::vector<HIR::declaration_t> decls;
     for (AST::declaration_t p: node->decls) {
-      decls.push_back(visit(p));
+      HIR::declaration_t d = visit(p);
+      d->dt = dt;
+      decls.push_back(d);
     }
     return HIR::Decl(dt, decls);
   }
@@ -1499,7 +1501,8 @@ class SemaVisitor : public AST::BaseVisitor {
             HIR::datatype_t type = argtypes[i] != nullptr ? argtypes[i]
                                                           : args[i]->type;
             new_args.push_back(HIR::declaration(def->args[i]->name, nullptr,
-                                                def->args[i]->value, type, 0));
+                                                def->args[i]->value,
+                                                def->args[i]->dt, type, 0));
           }
           // TODO recursively copy def's body (needs HIR visitor)
           std::vector<HIR::stmt_t> new_body;
@@ -1831,7 +1834,9 @@ class SemaVisitor : public AST::BaseVisitor {
     }
     // construct reference if no errors occurred so far
     HIR::declaration_t new_node = HIR::declaration(node->name, explicit_type,
-                                                   value, type, 0);
+                                                   value,
+                                                   HIR::decltype_t::kLet,
+                                                   type, 0);
     if (sema_err_.str().size() == starting_err_length) {
       if (!store_symbol(node->name, HIR::DeclRef(new_node))) {
         sema_err_ << "Error: symbol " << node->name
