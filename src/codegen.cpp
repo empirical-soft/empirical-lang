@@ -13,6 +13,7 @@
 #include <unordered_map>
 
 #include <empirical.hpp>
+#include <traits.hpp>
 
 // build VVM bytecode from high-level IR (HIR)
 class CodegenVisitor : public HIR::BaseVisitor {
@@ -182,7 +183,8 @@ class CodegenVisitor : public HIR::BaseVisitor {
   // save string directly; no need to escape or infer an expr's type
   VVM::operand_t direct_repr(const std::string& s) {
     directed_repr_ = true;
-    return visit(HIR::Str(s, nullptr, ""));
+    return visit(HIR::Str(s, nullptr, all_traits, HIR::compmode_t::kComptime,
+                          ""));
   }
 
   void nyi(const std::string& rule) const {
@@ -680,17 +682,21 @@ class CodegenVisitor : public HIR::BaseVisitor {
 
   antlrcpp::Any visitUnaryOp(HIR::UnaryOp_t node) override {
     // operator expressions are just syntactic sugar for function calls
-    HIR::expr_t id = HIR::Id(node->op, node->ref, nullptr, node->op);
-    HIR::expr_t desugar = HIR::FunctionCall(id, {node->operand}, node->type,
-                                            id->name);
+    HIR::expr_t id = HIR::Id(node->op, node->ref, nullptr, empty_traits,
+                             HIR::compmode_t::kNormal, node->op);
+    HIR::expr_t desugar =
+      HIR::FunctionCall(id, {node->operand}, node->type, node->traits,
+                        node->mode, id->name);
     return visit(desugar);
   }
 
   antlrcpp::Any visitBinOp(HIR::BinOp_t node) override {
     // operator expressions are just syntactic sugar for function calls
-    HIR::expr_t id = HIR::Id(node->op, node->ref, nullptr, node->op);
-    HIR::expr_t desugar = HIR::FunctionCall(id, {node->left, node->right},
-                                            node->type, id->name);
+    HIR::expr_t id = HIR::Id(node->op, node->ref, nullptr, empty_traits,
+                             HIR::compmode_t::kNormal, node->op);
+    HIR::expr_t desugar =
+      HIR::FunctionCall(id, {node->left, node->right}, node->type,
+                        node->traits, node->mode, id->name);
     return visit(desugar);
   }
 
@@ -736,8 +742,8 @@ class CodegenVisitor : public HIR::BaseVisitor {
         VVM::operand_t op = func_map_[fd];
         result = reserve_space();
         params.push_back(result);
-        VVM::operand_t length = VVM::encode_operand(params.size(),
-                                                    VVM::OpMask::kImmediate);
+        VVM::operand_t length =
+          VVM::encode_operand(params.size(), VVM::OpMask::kImmediate);
         params.insert(params.begin(), length);
         params.insert(params.begin(), op);
         emit(VVM::opcodes::call, params);
@@ -799,6 +805,16 @@ class CodegenVisitor : public HIR::BaseVisitor {
     return direct_repr(node->s);
   }
 
+  antlrcpp::Any visitTraitsOf(HIR::TraitsOf_t node) override {
+    // we only reach this node if the user requests it via REPL
+    return direct_repr(node->s);
+  }
+
+  antlrcpp::Any visitModeOf(HIR::ModeOf_t node) override {
+    // we only reach this node if the user requests it via REPL
+    return direct_repr(node->s);
+  }
+
   antlrcpp::Any visitColumns(HIR::Columns_t node) override {
     // we only reach this node if the user requests it via REPL
     return direct_repr(node->s);
@@ -846,12 +862,15 @@ class CodegenVisitor : public HIR::BaseVisitor {
     }
   }
 
-  antlrcpp::Any visitUserDefinedLiteral(HIR::UserDefinedLiteral_t node) override {
+  antlrcpp::Any visitUserDefinedLiteral(HIR::UserDefinedLiteral_t node)
+    override {
     // user-defined literals are just syntactic sugar for funcion calls
     HIR::expr_t id = HIR::Id("suffix" + node->suffix, node->ref, nullptr,
+                             empty_traits, HIR::compmode_t::kNormal,
                              node->suffix);
-    HIR::expr_t desugar = HIR::FunctionCall(id, {node->literal}, node->type,
-                                            id->name);
+    HIR::expr_t desugar =
+      HIR::FunctionCall(id, {node->literal}, node->type, node->traits,
+                        node->mode, id->name);
     return visit(desugar);
   }
 
@@ -891,8 +910,9 @@ class CodegenVisitor : public HIR::BaseVisitor {
 
   antlrcpp::Any visitImpliedMember(HIR::ImpliedMember_t node) override {
     // an ID found in a preferred scope is an implied member
-    HIR::expr_t member = HIR::Member(node->implied_value, node->s,
-                                     node->ref, node->type, node->s);
+    HIR::expr_t member =
+      HIR::Member(node->implied_value, node->s, node->ref, node->type,
+                  node->traits, node->mode, node->s);
     return visit(member);
   }
 
@@ -969,6 +989,11 @@ class CodegenVisitor : public HIR::BaseVisitor {
 
   antlrcpp::Any visitDirection(HIR::direction_t value) override {
     nyi("Direction");
+    return 0;
+  }
+
+  antlrcpp::Any visitCompmode(HIR::compmode_t value) override {
+    nyi("Compmode");
     return 0;
   }
 
