@@ -15,6 +15,7 @@
 #include <unordered_map>
 
 #include <empirical.hpp>
+#include <traits.hpp>
 
 #include <VVM/types.h>
 #include <VVM/opcodes.h>
@@ -24,6 +25,95 @@
 class SemaVisitor : public AST::BaseVisitor {
   // store all prior IR
   std::vector<HIR::stmt_t> history_;
+
+  /* function traits and compute modes */
+
+  // whether a particular trait is present
+  bool contains_trait(Traits traits, SingleTrait t) {
+    return traits & size_t(t);
+  }
+
+  // return intersection of all expr traits
+  Traits intersect_traits(const std::vector<HIR::expr_t>& exprs) {
+    Traits t = -1;
+    for (HIR::expr_t e: exprs) {
+      if (e != nullptr) {
+        t &= e->traits;
+      }
+    }
+    return t;
+  }
+
+  // return compound mode from all expr modes
+  HIR::compmode_t compound_mode(const std::vector<HIR::expr_t>& exprs) {
+    HIR::compmode_t mode = HIR::compmode_t::kComptime;
+    for (HIR::expr_t e: exprs) {
+      if (e != nullptr) {
+        // any stream
+        if (e->mode == HIR::compmode_t::kStream) {
+          return e->mode;
+        }
+        // all comptime
+        if (e->mode != HIR::compmode_t::kComptime) {
+          mode = HIR::compmode_t::kNormal;
+        }
+      }
+    }
+    return mode;
+  }
+
+  // determine a function call's traits and mode
+  void determine_traits_and_mode(Traits func_traits,
+                                 const std::vector<HIR::expr_t>& args,
+                                 Traits& traits,
+                                 HIR::compmode_t& mode) {
+    Traits arg_traits = intersect_traits(args);
+    traits = func_traits & arg_traits;
+    HIR::compmode_t arg_mode = compound_mode(args);
+    mode = HIR::compmode_t::kNormal;
+    if (contains_trait(func_traits, SingleTrait::kAutostream) ||
+        (contains_trait(func_traits, SingleTrait::kLinear) &&
+         arg_mode == HIR::compmode_t::kStream)) {
+      mode = HIR::compmode_t::kStream;
+    }
+    else if (contains_trait(func_traits, SingleTrait::kPure) &&
+             arg_mode == HIR::compmode_t::kComptime) {
+      mode = HIR::compmode_t::kComptime;
+    }
+  }
+
+  // append vector of exprs converted from vector of aliases
+  void append_exprs(const std::vector<HIR::alias_t>& xs,
+                    std::vector<HIR::expr_t>& ys) {
+    for (HIR::alias_t x: xs) {
+      ys.push_back(x->value);
+    }
+  }
+
+  // string-ify traits
+  std::string to_string_traits(Traits traits) {
+    std::string prepend, result;
+    if (contains_trait(traits, SingleTrait::kPure)) {
+      result += prepend + "pure";
+      prepend = ", ";
+    }
+    if (contains_trait(traits, SingleTrait::kTransform)) {
+      result += prepend + "transform";
+      prepend = ", ";
+    }
+    if (contains_trait(traits, SingleTrait::kLinear)) {
+      result += prepend + "linear";
+      prepend = ", ";
+    }
+    if (contains_trait(traits, SingleTrait::kAutostream)) {
+      result += prepend + "autostream";
+      prepend = ", ";
+    }
+    if (result.empty()) {
+      result = "none";
+    }
+    return result;
+  }
 
   /* get info from a node */
 
@@ -77,6 +167,71 @@ class SemaVisitor : public AST::BaseVisitor {
     }
   }
 
+  // return resolved item's traits
+  Traits get_traits(HIR::resolved_t node) {
+    if (node == nullptr) {
+      return empty_traits;
+    }
+    switch (node->resolved_kind) {
+      case HIR::resolved_::ResolvedKind::kDeclRef: {
+        HIR::DeclRef_t ptr = dynamic_cast<HIR::DeclRef_t>(node);
+        return ptr->ref->traits;
+      }
+      case HIR::resolved_::ResolvedKind::kFuncRef: {
+        HIR::FuncRef_t ptr = dynamic_cast<HIR::FuncRef_t>(node);
+        HIR::FunctionDef_t def = dynamic_cast<HIR::FunctionDef_t>(ptr->ref);
+        return def->traits;
+      }
+      case HIR::resolved_::ResolvedKind::kGenericFuncRef: {
+        HIR::GenericFuncRef_t ptr = dynamic_cast<HIR::GenericFuncRef_t>(node);
+        HIR::GenericFunctionDef_t def =
+          dynamic_cast<HIR::GenericFunctionDef_t>(ptr->ref);
+        HIR::FunctionDef_t original =
+          dynamic_cast<HIR::FunctionDef_t>(def->original_func);
+        return original->traits;
+      }
+      case HIR::resolved_::ResolvedKind::kDataRef: {
+        return empty_traits;
+      }
+      case HIR::resolved_::ResolvedKind::kModRef: {
+        return empty_traits;
+      }
+      case HIR::resolved_::ResolvedKind::kVVMOpRef: {
+        HIR::VVMOpRef_t ptr = dynamic_cast<HIR::VVMOpRef_t>(node);
+        HIR::FuncType_t ft = dynamic_cast<HIR::FuncType_t>(ptr->type);
+        return ft->traits;
+      }
+      case HIR::resolved_::ResolvedKind::kVVMTypeRef: {
+        return empty_traits;
+      }
+      case HIR::resolved_::ResolvedKind::kCompilerRef: {
+        HIR::CompilerRef_t ptr = dynamic_cast<HIR::CompilerRef_t>(node);
+        HIR::FuncType_t ft = dynamic_cast<HIR::FuncType_t>(ptr->type);
+        return ft->traits;
+      }
+      case HIR::resolved_::ResolvedKind::kSemaRef: {
+        HIR::SemaRef_t ptr = dynamic_cast<HIR::SemaRef_t>(node);
+        HIR::FuncType_t ft = dynamic_cast<HIR::FuncType_t>(ptr->type);
+        return ft->traits;
+      }
+    }
+  }
+
+  // return resolved item's mode
+  HIR::compmode_t get_mode(HIR::resolved_t node) {
+    if (node == nullptr) {
+      return HIR::compmode_t::kNormal;
+    }
+    switch (node->resolved_kind) {
+      case HIR::resolved_::ResolvedKind::kDeclRef: {
+        HIR::DeclRef_t ptr = dynamic_cast<HIR::DeclRef_t>(node);
+        return ptr->ref->mode;
+      }
+      default:
+        return HIR::compmode_t::kNormal;
+    }
+  }
+
   // return type from a function definition
   HIR::datatype_t get_type(HIR::FunctionDef_t node) {
     std::vector<HIR::datatype_t> argtypes;
@@ -84,7 +239,8 @@ class SemaVisitor : public AST::BaseVisitor {
       argtypes.push_back(arg->type);
     }
     HIR::datatype_t rettype = node->rettype;
-    return FuncType(argtypes, rettype);
+    Traits traits = node->traits;
+    return FuncType(argtypes, rettype, traits);
   }
 
   // return resolved item's scope, or zero if not available
@@ -263,7 +419,12 @@ class SemaVisitor : public AST::BaseVisitor {
   /* type check */
 
   // list of return types for each function definition in stack
-  std::stack<std::vector<HIR::datatype_t>> rettype_stack_;
+  struct RetInfo {
+    HIR::datatype_t type;
+    Traits traits;
+    RetInfo(HIR::datatype_t dt, Traits t): type(dt), traits(t) {}
+  };
+  std::stack<std::vector<RetInfo>> retinfo_stack_;
 
   // string-ify a datatype
   std::string to_string(HIR::datatype_t node) {
@@ -448,7 +609,8 @@ class SemaVisitor : public AST::BaseVisitor {
       size_t scope = current_scope_;
       for (HIR::declaration_t b: node->body) {
         auto d = HIR::declaration(b->name, nullptr, b->value, b->dt,
-                                  HIR::Array(b->type), b->offset);
+                                  HIR::Array(b->type), empty_traits,
+                                  HIR::compmode_t::kNormal, b->offset);
         store_symbol(b->name, HIR::DeclRef(d));
         body.push_back(d);
       }
@@ -818,6 +980,8 @@ class SemaVisitor : public AST::BaseVisitor {
 
   enum class SemaCodes: size_t {
     kTypeOf,
+    kTraitsOf,
+    kModeOf,
     kColumns
   };
 
@@ -834,6 +998,12 @@ class SemaVisitor : public AST::BaseVisitor {
         switch (code) {
           case SemaCodes::kTypeOf: {
             return sema_function_type_of(args);
+          }
+          case SemaCodes::kTraitsOf: {
+            return sema_function_traits_of(args);
+          }
+          case SemaCodes::kModeOf: {
+            return sema_function_mode_of(args);
           }
           case SemaCodes::kColumns: {
             return sema_function_columns(args);
@@ -860,7 +1030,24 @@ class SemaVisitor : public AST::BaseVisitor {
         }
       }
     }
-    return HIR::TypeOf(a, s, HIR::Kind(t), a->name);
+    return HIR::TypeOf(a, s, HIR::Kind(t), all_traits,
+                       HIR::compmode_t::kComptime, a->name);
+  }
+
+  // traits_of() function
+  HIR::expr_t sema_function_traits_of(const std::vector<HIR::expr_t>& args) {
+    HIR::expr_t a = args[0];
+    std::string s = to_string_traits(a->traits);
+    return HIR::TraitsOf(a, s, HIR::Void(), all_traits,
+                         HIR::compmode_t::kComptime, a->name);
+  }
+
+  // mode_of() function
+  HIR::expr_t sema_function_mode_of(const std::vector<HIR::expr_t>& args) {
+    HIR::expr_t a = args[0];
+    std::string s = HIR::to_string(a->mode);
+    return HIR::ModeOf(a, s, HIR::Void(), all_traits,
+                       HIR::compmode_t::kComptime, a->name);
   }
 
   // columns() function
@@ -875,20 +1062,27 @@ class SemaVisitor : public AST::BaseVisitor {
     if (get_scope(t)) {
       s = get_type_string(t, "\n");
     }
-    return HIR::Columns(a, s, HIR::Void(), a->name);
+    return HIR::Columns(a, s, HIR::Void(), all_traits,
+                        HIR::compmode_t::kComptime, a->name);
   }
 
   // save all builtin items so that id resolution will find them
   void save_builtins() {
     store_symbol("type_of", HIR::SemaRef(size_t(SemaCodes::kTypeOf),
-      HIR::FuncType({nullptr}, HIR::Void())));
+      HIR::FuncType({nullptr}, HIR::Void(), all_traits)));
+
+    store_symbol("traits_of", HIR::SemaRef(size_t(SemaCodes::kTraitsOf),
+      HIR::FuncType({nullptr}, HIR::Void(), all_traits)));
+
+    store_symbol("mode_of", HIR::SemaRef(size_t(SemaCodes::kModeOf),
+      HIR::FuncType({nullptr}, HIR::Void(), all_traits)));
 
     store_symbol("columns", HIR::SemaRef(size_t(SemaCodes::kColumns),
-      HIR::FuncType({nullptr}, HIR::Void())));
+      HIR::FuncType({nullptr}, HIR::Void(), all_traits)));
 
     store_symbol("store", HIR::CompilerRef(size_t(CompilerCodes::kStore),
       HIR::FuncType({nullptr, HIR::VVMType(size_t(VVM::vvm_types::Ss))},
-                    HIR::Void())));
+                    HIR::Void(), io_traits)));
 
 #include <VVM/builtins.h>
   }
@@ -944,9 +1138,9 @@ class SemaVisitor : public AST::BaseVisitor {
     }
     // create shell now so body can have recursion
     std::vector<HIR::stmt_t> body;
-    HIR::stmt_t new_node = HIR::FunctionDef(node->name, args, body,
-                                            explicit_rettype, node->docstring,
-                                            rettype);
+    HIR::stmt_t new_node =
+      HIR::FunctionDef(node->name, args, body, explicit_rettype,
+                       node->docstring, rettype, empty_traits);
     HIR::FunctionDef_t fd = dynamic_cast<HIR::FunctionDef_t>(new_node);
     // missing argument types implies generic function
     HIR::stmt_t generic = nullptr;
@@ -967,7 +1161,7 @@ class SemaVisitor : public AST::BaseVisitor {
     }
     // evaluate body in the inner scope
     current_scope_ = inner_scope;
-    rettype_stack_.push(std::vector<HIR::datatype_t>());
+    retinfo_stack_.push(std::vector<RetInfo>());
     for (AST::stmt_t b: node->body) {
       body.push_back(visit(b));
     }
@@ -975,22 +1169,25 @@ class SemaVisitor : public AST::BaseVisitor {
     pop_scope();
     // get body's return type
     HIR::datatype_t body_rettype = nullptr;
-    auto& rettypes = rettype_stack_.top();
-    if (rettypes.empty()) {
+    Traits traits = empty_traits;
+    auto& retinfos = retinfo_stack_.top();
+    if (retinfos.empty()) {
       sema_err_ << "Error: function " << node->name
                 << " has no return statements" << std::endl;
     }
     else {
-      body_rettype = rettypes[0];
-      for (size_t i = 1; i < rettypes.size(); i++) {
-        if (!is_same_type(body_rettype, rettypes[i])) {
+      body_rettype = retinfos[0].type;
+      traits = retinfos[0].traits;
+      for (size_t i = 1; i < retinfos.size(); i++) {
+        if (!is_same_type(body_rettype, retinfos[i].type)) {
           sema_err_ << "Error: mismatched return types in function "
                     << node->name << ": " << to_string(body_rettype) << " vs "
-                    << to_string(rettypes[i]) << std::endl;
+                    << to_string(retinfos[i].type) << std::endl;
         }
+        traits &= retinfos[i].traits;
       }
     }
-    rettype_stack_.pop();
+    retinfo_stack_.pop();
     // infer return type if needed
     if (rettype == nullptr) {
       rettype = body_rettype;
@@ -1025,6 +1222,7 @@ class SemaVisitor : public AST::BaseVisitor {
     }
     // put everything together
     fd->rettype = rettype;
+    fd->traits = traits;
     return generic ? generic : new_node;
   }
 
@@ -1067,13 +1265,14 @@ class SemaVisitor : public AST::BaseVisitor {
     if (node->value) {
       e = visit(node->value);
     }
-    if (rettype_stack_.empty()) {
+    if (retinfo_stack_.empty()) {
       sema_err_ << "Error: return statement is not in function body"
                 << std::endl;
     }
     else {
       HIR::datatype_t dt = e ? e->type : HIR::Void();
-      rettype_stack_.top().push_back(dt);
+      Traits t = e ? e->traits : empty_traits;
+      retinfo_stack_.top().emplace_back(dt, t);
     }
     return HIR::Return(e);
   }
@@ -1234,8 +1433,17 @@ class SemaVisitor : public AST::BaseVisitor {
     }
     preferred_scope_ = nullptr;
 
+    // traits and mode
+    std::vector<HIR::expr_t> exprs = {table, where};
+    append_exprs(cols, exprs);
+    append_exprs(by, exprs);
+    Traits traits;
+    HIR::compmode_t mode;
+    determine_traits_and_mode(all_traits, exprs, traits, mode);
+
     // put everything together
-    return HIR::Query(table, qt, cols, by, where, by_type, type, table->name);
+    return HIR::Query(table, qt, cols, by, where, by_type, type, traits, mode,
+                      table->name);
   }
 
   antlrcpp::Any visitSort(AST::Sort_t node) override {
@@ -1261,8 +1469,15 @@ class SemaVisitor : public AST::BaseVisitor {
     (void) create_datatype(by_name, ts);
     HIR::datatype_t by_type = make_dataframe('!' + by_name);
 
+    // traits and mode
+    std::vector<HIR::expr_t> exprs = {table};
+    append_exprs(by, exprs);
+    Traits traits;
+    HIR::compmode_t mode;
+    determine_traits_and_mode(ra_traits, exprs, traits, mode);
+
     // put everything together
-    return HIR::Sort(table, by, by_type, type, table->name);
+    return HIR::Sort(table, by, by_type, type, traits, mode, table->name);
   }
 
   antlrcpp::Any visitJoin(AST::Join_t node) override {
@@ -1415,10 +1630,24 @@ class SemaVisitor : public AST::BaseVisitor {
       full_type = make_dataframe('!' + full_name);
     }
 
+    // traits and mode
+    std::vector<HIR::expr_t> exprs = {left, right, within};
+    append_exprs(left_on, exprs);
+    append_exprs(right_on, exprs);
+    if (left_asof != nullptr) {
+      exprs.push_back(left_asof->value);
+    }
+    if (right_asof != nullptr) {
+      exprs.push_back(right_asof->value);
+    }
+    Traits traits;
+    HIR::compmode_t mode;
+    determine_traits_and_mode(all_traits, exprs, traits, mode);
+
     // put everything together
     return HIR::Join(left, right, left_on, right_on, left_on_type,
                      right_on_type, left_asof, right_asof, strict, direction,
-                     within, remaining_type, full_type,
+                     within, remaining_type, full_type, traits, mode,
                      left->name + right->name);
   }
 
@@ -1437,7 +1666,7 @@ class SemaVisitor : public AST::BaseVisitor {
     }
     HIR::expr_t operand = func_call->args[0];
     return HIR::UnaryOp(node->op, operand, ref, func_call->type,
-                        func_call->name);
+                        func_call->traits, func_call->mode, func_call->name);
   }
 
   antlrcpp::Any visitBinOp(AST::BinOp_t node) override {
@@ -1456,7 +1685,7 @@ class SemaVisitor : public AST::BaseVisitor {
     HIR::expr_t left = func_call->args[0];
     HIR::expr_t right = func_call->args[1];
     return HIR::BinOp(left, node->op, right, ref, func_call->type,
-                      func_call->name);
+                      func_call->traits, func_call->mode, func_call->name);
   }
 
   antlrcpp::Any visitFunctionCall(AST::FunctionCall_t node) override {
@@ -1482,12 +1711,13 @@ class SemaVisitor : public AST::BaseVisitor {
         if (result.empty()) {
           // replace generic with previously instantiated function
           HIR::resolved_t ref = FuncRef(def);
-          func = HIR::Id(def->name, ref, func_type, def->name);
+          func = HIR::Id(def->name, ref, func_type, def->traits,
+                         HIR::compmode_t::kNormal, def->name);
           previously_instantiated = true;
           break;
         }
       }
-      // create new instantiated since nothing appropriate found
+      // create new instance since nothing appropriate found
       if (!previously_instantiated) {
         HIR::FunctionDef_t def =
           dynamic_cast<HIR::FunctionDef_t>(generic->original_func);
@@ -1498,23 +1728,25 @@ class SemaVisitor : public AST::BaseVisitor {
           std::vector<HIR::declaration_t> new_args;
           std::vector<HIR::datatype_t> argtypes = get_argtypes(func_type);
           for (size_t i = 0; i < args.size(); i++) {
-            HIR::datatype_t type = argtypes[i] != nullptr ? argtypes[i]
-                                                          : args[i]->type;
-            new_args.push_back(HIR::declaration(def->args[i]->name, nullptr,
-                                                def->args[i]->value,
-                                                def->args[i]->dt, type, 0));
+            HIR::datatype_t type =
+              argtypes[i] != nullptr ? argtypes[i] : args[i]->type;
+            new_args.push_back(
+              HIR::declaration(def->args[i]->name, nullptr,
+                               def->args[i]->value, def->args[i]->dt, type,
+                               empty_traits, HIR::compmode_t::kNormal, 0));
           }
           // TODO recursively copy def's body (needs HIR visitor)
           std::vector<HIR::stmt_t> new_body;
           // generate function
-          HIR::stmt_t new_def = HIR::FunctionDef(def->name, new_args, new_body,
-                                                 nullptr, def->docstring,
-                                                 def->rettype);
+          HIR::stmt_t new_def =
+            HIR::FunctionDef(def->name, new_args, new_body, nullptr,
+                             def->docstring, def->rettype, empty_traits);
           generic->instantiated_funcs.push_back(new_def);
           HIR::resolved_t ref = FuncRef(new_def);
           HIR::FunctionDef_t node = dynamic_cast<HIR::FunctionDef_t>(new_def);
           HIR::datatype_t new_func_type = get_type(node);
-          func = HIR::Id(def->name, ref, new_func_type, def->name);
+          func = HIR::Id(def->name, ref, new_func_type, empty_traits,
+                         HIR::compmode_t::kNormal, def->name);
         }
         else {
           sema_err_ << "Error: " << err_msg << std::endl;
@@ -1534,7 +1766,8 @@ class SemaVisitor : public AST::BaseVisitor {
         std::string result = match_args(args, func_type);
         if (result.empty()) {
           // replace overload with specific function
-          func = HIR::Id(id->s, ref, func_type, id->s);
+          func = HIR::Id(id->s, ref, func_type, get_traits(ref),
+                         HIR::compmode_t::kNormal, id->s);
           err_msg.clear();
           break;
         }
@@ -1568,10 +1801,14 @@ class SemaVisitor : public AST::BaseVisitor {
     if (attempt != nullptr) {
       return attempt;
     }
+    // traits and mode
+    Traits traits;
+    HIR::compmode_t mode;
+    determine_traits_and_mode(func->traits, args, traits, mode);
     // wrap everything together
     HIR::datatype_t rettype = get_rettype(func->type);
     std::string name = !args.empty() ? args[0]->name : func->name;
-    return HIR::FunctionCall(func, args, rettype, name);
+    return HIR::FunctionCall(func, args, rettype, traits, mode, name);
   }
 
   antlrcpp::Any visitTemplateInst(AST::TemplateInst_t node) override {
@@ -1583,7 +1820,11 @@ class SemaVisitor : public AST::BaseVisitor {
     if (ptr->s != "load") {
       nyi("TemplateInst on non-load");
     }
-    HIR::expr_t value = HIR::Id("load", nullptr, nullptr, "load");
+    // "load" is always streaming IO
+    Traits traits = io_traits | Traits(SingleTrait::kAutostream);
+    HIR::compmode_t mode = HIR::compmode_t::kStream;
+    HIR::expr_t value = HIR::Id("load", nullptr, nullptr, traits,
+                                HIR::compmode_t::kNormal, "load");
     std::vector<HIR::expr_t> args;
     for (AST::expr_t e: node->args) {
       args.push_back(visit(e));
@@ -1610,7 +1851,8 @@ class SemaVisitor : public AST::BaseVisitor {
       }
     }
     HIR::datatype_t rettype = make_dataframe('!' + type_name);
-    return HIR::TemplateInst(value, args, resolutions, rettype, value->name);
+    return HIR::TemplateInst(value, args, resolutions, rettype, io_traits,
+                             mode, value->name);
   }
 
   antlrcpp::Any visitMember(AST::Member_t node) override {
@@ -1629,7 +1871,8 @@ class SemaVisitor : public AST::BaseVisitor {
     if (ref != nullptr && type == nullptr) {
       sema_err_ << "Error: unable to resolve type" << std::endl;
     }
-    return HIR::Member(value, node->member, ref, type, node->member);
+    return HIR::Member(value, node->member, ref, type, value->traits,
+                       value->mode, node->member);
   }
 
   antlrcpp::Any visitSubscript(AST::Subscript_t node) override {
@@ -1639,15 +1882,26 @@ class SemaVisitor : public AST::BaseVisitor {
                 << to_string(value->type) << std::endl;
     }
     HIR::slice_t slice = visit(node->slice);
-    // for an index (non-slice) subscript, the result is the underlying type
-    HIR::datatype_t type = value->type;
-    if (!is_slice(slice)) {
-      type = get_underlying_type(type);
+    // get type, traits, and mode for either full slice or standalone index
+    HIR::datatype_t type;
+    Traits traits;
+    HIR::compmode_t mode;
+    if (is_slice(slice)) {
+      type = value->type;
+      HIR::Slice_t s = dynamic_cast<HIR::Slice_t>(slice);
+      determine_traits_and_mode(ra_traits, {s->lower, s->upper, s->step},
+                                traits, mode);
     }
-    return HIR::Subscript(value, slice, type, value->name);
+    else {
+      type = get_underlying_type(value->type);
+      HIR::Index_t idx = dynamic_cast<HIR::Index_t>(slice);
+      determine_traits_and_mode(ra_traits, {idx->value}, traits, mode);
+    }
+    return HIR::Subscript(value, slice, type, traits, mode, value->name);
   }
 
-  antlrcpp::Any visitUserDefinedLiteral(AST::UserDefinedLiteral_t node) override {
+  antlrcpp::Any visitUserDefinedLiteral(AST::UserDefinedLiteral_t node)
+    override {
     // user-defined literals are just syntactic sugar for funcion calls
     AST::expr_t desugar = AST::FunctionCall(AST::Id("suffix" + node->suffix),
                                             {node->literal});
@@ -1663,27 +1917,36 @@ class SemaVisitor : public AST::BaseVisitor {
     }
     HIR::expr_t literal = func_call->args[0];
     return HIR::UserDefinedLiteral(literal, node->suffix, ref, func_call->type,
+                                   func_call->traits, func_call->mode,
                                    func_call->name);
   }
 
   antlrcpp::Any visitIntegerLiteral(AST::IntegerLiteral_t node) override {
-    return HIR::IntegerLiteral(node->n, HIR::VVMType(size_t(VVM::vvm_types::i64s)), "");
+    return HIR::IntegerLiteral(node->n,
+                               HIR::VVMType(size_t(VVM::vvm_types::i64s)),
+                               all_traits, HIR::compmode_t::kComptime, "");
   }
 
   antlrcpp::Any visitFloatingLiteral(AST::FloatingLiteral_t node) override {
-    return HIR::FloatingLiteral(node->n, HIR::VVMType(size_t(VVM::vvm_types::f64s)), "");
+    return HIR::FloatingLiteral(node->n,
+                                HIR::VVMType(size_t(VVM::vvm_types::f64s)),
+                                all_traits, HIR::compmode_t::kComptime, "");
   }
 
   antlrcpp::Any visitBoolLiteral(AST::BoolLiteral_t node) override {
-    return HIR::BoolLiteral(node->b, HIR::VVMType(size_t(VVM::vvm_types::b8s)), "");
+    return HIR::BoolLiteral(node->b,
+                            HIR::VVMType(size_t(VVM::vvm_types::b8s)),
+                            all_traits, HIR::compmode_t::kComptime, "");
   }
 
   antlrcpp::Any visitStr(AST::Str_t node) override {
-    return HIR::Str(node->s, HIR::VVMType(size_t(VVM::vvm_types::Ss)), "");
+    return HIR::Str(node->s, HIR::VVMType(size_t(VVM::vvm_types::Ss)),
+                    all_traits, HIR::compmode_t::kComptime, "");
   }
 
   antlrcpp::Any visitChar(AST::Char_t node) override {
-    return HIR::Char(node->c, HIR::VVMType(size_t(VVM::vvm_types::c8s)), "");
+    return HIR::Char(node->c, HIR::VVMType(size_t(VVM::vvm_types::c8s)),
+                     all_traits, HIR::compmode_t::kComptime, "");
   }
 
   antlrcpp::Any visitId(AST::Id_t node) override {
@@ -1691,7 +1954,6 @@ class SemaVisitor : public AST::BaseVisitor {
     if (node->s[0] == '!') {
       (void) make_dataframe(node->s);
     }
-
     // look for symbol
     bool in_preferred;
     Scope::Resolveds resolveds = find_symbol(node->s, &in_preferred);
@@ -1699,17 +1961,20 @@ class SemaVisitor : public AST::BaseVisitor {
       sema_err_ << "Error: symbol " << node->s
                 << " was not found" << std::endl;
     }
+    // get info, which will be a placeholder for overloaded IDs
+    HIR::resolved_t ptr = resolveds.empty() ? nullptr : resolveds[0];
+    HIR::datatype_t type = get_type(ptr);
+    Traits traits = get_traits(ptr);
+    HIR::compmode_t mode = get_mode(ptr);
+    // determine how to present the ID
     if (resolveds.size() <= 1) {
-      HIR::resolved_t ptr = (resolveds.size() == 1) ? resolveds[0] : nullptr;
-      HIR::datatype_t type = get_type(ptr);
       if (in_preferred) {
         return HIR::ImpliedMember(node->s, ptr, preferred_scope_, type,
-                                  node->s);
+                                  traits, mode, node->s);
       }
-      return HIR::Id(node->s, ptr, type, node->s);
+      return HIR::Id(node->s, ptr, type, traits, mode, node->s);
     }
-    HIR::datatype_t temp_type = get_type(resolveds[0]);
-    return HIR::OverloadedId(node->s, resolveds, temp_type, node->s);
+    return HIR::OverloadedId(node->s, resolveds, type, traits, mode, node->s);
   }
 
   antlrcpp::Any visitList(AST::List_t node) override {
@@ -1738,12 +2003,15 @@ class SemaVisitor : public AST::BaseVisitor {
     else {
       type = HIR::Array(expected);
     }
-    return HIR::List(values, type, name);
+    Traits traits = intersect_traits(values);
+    HIR::compmode_t mode = compound_mode(values);
+    return HIR::List(values, type, traits, mode, name);
   }
 
   antlrcpp::Any visitParen(AST::Paren_t node) override {
     HIR::expr_t subexpr = visit(node->subexpr);
-    return HIR::Paren(subexpr, subexpr->type, subexpr->name);
+    return HIR::Paren(subexpr, subexpr->type, subexpr->traits, subexpr->mode,
+                      subexpr->name);
   }
 
   antlrcpp::Any visitSlice(AST::Slice_t node) override {
@@ -1832,11 +2100,18 @@ class SemaVisitor : public AST::BaseVisitor {
     if (is_void_type(type)) {
       sema_err_ << "Error: symbol cannot have a 'void' type" << std::endl;
     }
+    // traits and mode
+    Traits traits = empty_traits;
+    HIR::compmode_t mode = HIR::compmode_t::kNormal;
+    if (value != nullptr) {
+      traits = value->traits;
+      mode = value->mode;
+    }
     // construct reference if no errors occurred so far
     HIR::declaration_t new_node = HIR::declaration(node->name, explicit_type,
                                                    value,
                                                    HIR::decltype_t::kLet,
-                                                   type, 0);
+                                                   type, traits, mode, 0);
     if (sema_err_.str().size() == starting_err_length) {
       if (!store_symbol(node->name, HIR::DeclRef(new_node))) {
         sema_err_ << "Error: symbol " << node->name

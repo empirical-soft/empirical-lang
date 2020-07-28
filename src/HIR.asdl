@@ -9,7 +9,7 @@ module HIR
 
   stmt = FunctionDef(identifier name, declaration* args, stmt* body,
                      expr? explicit_rettype, string? docstring,
-                     datatype rettype)
+                     datatype rettype, size_t traits)
        | GenericFunctionDef(stmt original_func, stmt* instantiated_funcs)
        | DataDef(identifier name, declaration* body, size_t scope)
        | Return(expr? value)
@@ -35,6 +35,8 @@ module HIR
        | FunctionCall(expr func, expr* args)
        | TemplateInst(expr value, expr* args, stmt* resolutions)
        | TypeOf(expr arg, string s)
+       | TraitsOf(expr arg, string s)
+       | ModeOf(expr arg, string s)
        | Columns(expr arg, string s)
        | Member(expr value, identifier member, resolved ref)
        | Subscript(expr value, slice slice)
@@ -49,7 +51,8 @@ module HIR
        | OverloadedId(identifier s, resolved* refs)
        | List(expr* values)
        | Paren(expr subexpr)
-       attributes(datatype? type, identifier? name)
+       attributes(datatype? type, size_t traits, compmode mode,
+                  identifier? name)
 
   slice = Slice(expr? lower, expr? upper, expr? step)
         | Index(expr value)
@@ -57,7 +60,8 @@ module HIR
   alias = (expr value, identifier? name)
 
   declaration = (identifier name, expr? explicit_type, expr? value,
-                 decltype dt, datatype type, size_t offset)
+                 decltype dt, datatype type, size_t traits, compmode mode,
+                 size_t offset)
 
   decltype = Let | Var
 
@@ -65,10 +69,12 @@ module HIR
 
   direction = Default | Backward | Forward | Nearest
 
+  compmode = Normal | Stream | Comptime
+
   datatype = VVMType(size_t t)
            | UDT(identifier s, resolved ref)
            | Array(datatype type)
-           | FuncType(datatype* argtypes, datatype rettype)
+           | FuncType(datatype* argtypes, datatype rettype, size_t traits)
            | Kind(datatype type)
            | Void
 

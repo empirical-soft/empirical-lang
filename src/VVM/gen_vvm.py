@@ -501,14 +501,32 @@ class BuiltinsWriter(HeaderWriter):
         self.emit('')
         self.emit('')
 
+        # function traits
+        none = 0; pure = 1; transform = 2; linear = 4; autostream = 8
+        all_traits = pure | transform | linear
+        io_traits = transform | linear  # input/output
+        ca_traits = pure | linear       # change array
+        ra_traits = pure | transform    # random access
+
         for o in opcodes:
             if len(o[0]) != 0:
+                traits = all_traits
+                d = {'load': autostream,
+                     'store': none,
+                     'print': none,
+                     'unique': ca_traits,
+                     'idx': ra_traits,
+                     'multidx': ra_traits,
+                     'sort': ra_traits,
+                     'range': all_traits | autostream}
+                if o[0] in d:
+                  traits = d[o[0]]
                 oc = get_opcode(o[1], o[2])
                 comment = '// "%s" %s %s' % (o[0], oc, o[2])
                 self.emit(comment)
                 ft = get_func_type(o[2])
                 oc_enum = "size_t(VVM::opcodes::%s)" % oc
-                ref = '%s, HIR::FuncType(%s)' % (oc_enum, ft)
+                ref = '%s, HIR::FuncType(%s, %d)' % (oc_enum, ft, traits)
                 store = ('store_symbol("%s", HIR::VVMOpRef(%s));' %
                          (o[0], ref))
                 self.emit(store)
