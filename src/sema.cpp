@@ -1134,7 +1134,9 @@ class SemaVisitor : public AST::BaseVisitor {
     size_t inner_scope = current_scope_;
     std::vector<HIR::declaration_t> args;
     for (AST::declaration_t a: node->args) {
-      args.push_back(visit(a));
+      HIR::declaration_t d = visit(a);
+      d->traits = all_traits;
+      args.push_back(d);
     }
     // create shell now so body can have recursion
     std::vector<HIR::stmt_t> body;
