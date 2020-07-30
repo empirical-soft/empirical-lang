@@ -64,6 +64,19 @@ Normal
 
 ```
 
+### Function
+
+```
+>>> func inc(x: Int64): return x + 1 end
+
+>>> traits_of(inc)
+pure, transform, linear
+
+>>> mode_of(inc(5))
+Comptime
+
+```
+
 ### Dataframe
 
 ```
