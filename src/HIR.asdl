@@ -12,7 +12,7 @@ module HIR
                      datatype rettype, size_t traits)
        | GenericFunctionDef(stmt original_func, stmt* instantiated_funcs)
        | DataDef(identifier name, declaration* body, size_t scope)
-       | Return(expr? value)
+       | Return(expr? value, expr? comptime_literal)
        | If(expr test, stmt* body, stmt* orelse)
        | While(expr test, stmt* body)
        | Import(alias* names)
@@ -61,7 +61,7 @@ module HIR
 
   declaration = (identifier name, expr? explicit_type, expr? value,
                  decltype dt, datatype type, size_t traits, compmode mode,
-                 size_t offset)
+                 expr? comptime_literal, size_t offset)
 
   decltype = Let | Var
 

@@ -518,7 +518,8 @@ class BuiltinsWriter(HeaderWriter):
                      'idx': ra_traits,
                      'multidx': ra_traits,
                      'sort': ra_traits,
-                     'range': all_traits | autostream}
+                     'range': all_traits | autostream,
+                     'now': io_traits}
                 if o[0] in d:
                   traits = d[o[0]]
                 oc = get_opcode(o[1], o[2])

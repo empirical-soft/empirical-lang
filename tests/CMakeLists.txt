@@ -4,33 +4,13 @@ else(WIN32)
     set(EXECUTABLE empirical)
 endif(WIN32)
 
-add_test(NAME test_sort
-         COMMAND ${CMAKE_BINARY_DIR}/${EXECUTABLE} --verify-markdown sort.md
-         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-
-add_test(NAME test_joins
-         COMMAND ${CMAKE_BINARY_DIR}/${EXECUTABLE} --verify-markdown joins.md
-         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-
-add_test(NAME test_time
-         COMMAND ${CMAKE_BINARY_DIR}/${EXECUTABLE} --verify-markdown time.md
-         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-
-add_test(NAME test_ops
-         COMMAND ${CMAKE_BINARY_DIR}/${EXECUTABLE} --verify-markdown ops.md
-         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-
-add_test(NAME test_math
-         COMMAND ${CMAKE_BINARY_DIR}/${EXECUTABLE} --verify-markdown math.md
-         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-
-add_test(NAME test_traits
-         COMMAND ${CMAKE_BINARY_DIR}/${EXECUTABLE} --verify-markdown traits.md
-         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-
-add_test(NAME test_err
-         COMMAND ${CMAKE_BINARY_DIR}/${EXECUTABLE} --verify-markdown err.md
-         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+file(GLOB MDFILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "*.md")
+list(REMOVE_ITEM MDFILES README.md)
+foreach(f ${MDFILES})
+  add_test(NAME test_${f}
+           COMMAND ${CMAKE_BINARY_DIR}/${EXECUTABLE} --verify-markdown ${f}
+           WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+endforeach(f ${MDFILES})
 
 # TODO need a Windows version of the test script
 if(NOT WIN32)

@@ -115,6 +115,80 @@ class SemaVisitor : public AST::BaseVisitor {
     return result;
   }
 
+  /* compile-time function evaluation */
+
+  // return a literal expression if one can be obtained at compile time
+  HIR::expr_t get_comptime_literal(HIR::expr_t node) {
+    if (node == nullptr) {
+      return nullptr;
+    }
+    switch (node->expr_kind) {
+      // direct literals (but not floating point)
+      case HIR::expr_::ExprKind::kIntegerLiteral:
+      case HIR::expr_::ExprKind::kBoolLiteral:
+      case HIR::expr_::ExprKind::kStr:
+      case HIR::expr_::ExprKind::kChar:
+        return node;
+      // for IDs, just copy the literal if it exists
+      case HIR::expr_::ExprKind::kId: {
+        HIR::Id_t id = dynamic_cast<HIR::Id_t>(node);
+        HIR::resolved_t ref = id->ref;
+        if (ref == nullptr) {
+          return nullptr;
+        }
+        switch (ref->resolved_kind) {
+          case HIR::resolved_::ResolvedKind::kDeclRef: {
+            HIR::DeclRef_t dr = dynamic_cast<HIR::DeclRef_t>(ref);
+            HIR::declaration_t decl = dr->ref;
+            if (decl->dt == HIR::decltype_t::kVar) {
+              return nullptr;
+            }
+            return decl->comptime_literal;
+          }
+          default:
+            return nullptr;
+        }
+      }
+      // try to evaluated any other expression
+      default:
+        return eval_comptime_literal(node);
+    }
+  }
+
+  // derive a literal expression if one can be obtained at compile time
+  HIR::expr_t eval_comptime_literal(HIR::expr_t node) {
+    if (node == nullptr) {
+      return nullptr;
+    }
+    if (node->mode != HIR::compmode_t::kComptime) {
+      return nullptr;
+    }
+    if (node->type != nullptr &&
+        node->type->datatype_kind == HIR::datatype_::DatatypeKind::kVVMType) {
+      HIR::VVMType_t vvm_type = dynamic_cast<HIR::VVMType_t>(node->type);
+      switch (VVM::vvm_types(vvm_type->t)) {
+        // must be representable as a literal (but not floating point)
+        case VVM::vvm_types::i64s:
+        case VVM::vvm_types::b8s:
+        case VVM::vvm_types::Ss:
+        case VVM::vvm_types::c8s: {
+          // round-trip through VVM
+          HIR::mod_t wrapper = HIR::Module({HIR::Expr(node)}, "");
+          VVM:: Program program = codegen(wrapper, true, false);
+          std::string result = VVM::interpret(program);
+          AST::mod_t ast = parse(result, true, false);
+          HIR::mod_t hir = sema(ast, true, false);
+          HIR::Module_t mod = dynamic_cast<HIR::Module_t>(hir);
+          HIR::Expr_t expr = dynamic_cast<HIR::Expr_t>(mod->body[0]);
+          return expr->value;
+        }
+        default:
+          return nullptr;
+      }
+    }
+    return nullptr;
+  }
+
   /* get info from a node */
 
   // return resolved item's type, or nullptr if not available
@@ -191,10 +265,10 @@ class SemaVisitor : public AST::BaseVisitor {
         return original->traits;
       }
       case HIR::resolved_::ResolvedKind::kDataRef: {
-        return empty_traits;
+        return all_traits;
       }
       case HIR::resolved_::ResolvedKind::kModRef: {
-        return empty_traits;
+        return all_traits;
       }
       case HIR::resolved_::ResolvedKind::kVVMOpRef: {
         HIR::VVMOpRef_t ptr = dynamic_cast<HIR::VVMOpRef_t>(node);
@@ -202,7 +276,7 @@ class SemaVisitor : public AST::BaseVisitor {
         return ft->traits;
       }
       case HIR::resolved_::ResolvedKind::kVVMTypeRef: {
-        return empty_traits;
+        return all_traits;
       }
       case HIR::resolved_::ResolvedKind::kCompilerRef: {
         HIR::CompilerRef_t ptr = dynamic_cast<HIR::CompilerRef_t>(node);
@@ -228,7 +302,7 @@ class SemaVisitor : public AST::BaseVisitor {
         return ptr->ref->mode;
       }
       default:
-        return HIR::compmode_t::kNormal;
+        return HIR::compmode_t::kComptime;
     }
   }
 
@@ -608,9 +682,10 @@ class SemaVisitor : public AST::BaseVisitor {
       push_scope();
       size_t scope = current_scope_;
       for (HIR::declaration_t b: node->body) {
-        auto d = HIR::declaration(b->name, nullptr, b->value, b->dt,
-                                  HIR::Array(b->type), empty_traits,
-                                  HIR::compmode_t::kNormal, b->offset);
+        auto d =
+          HIR::declaration(b->name, nullptr, b->value, b->dt,
+                           HIR::Array(b->type), empty_traits,
+                           HIR::compmode_t::kNormal, nullptr, b->offset);
         store_symbol(b->name, HIR::DeclRef(d));
         body.push_back(d);
       }
@@ -749,7 +824,7 @@ class SemaVisitor : public AST::BaseVisitor {
   // expressions are temporary if they do not outlive their immediate use
   bool is_temporary(HIR::expr_t node) {
     if (node != nullptr) {
-      switch(node->expr_kind) {
+      switch (node->expr_kind) {
         case HIR::expr_::ExprKind::kMember:
         case HIR::expr_::ExprKind::kSubscript:
         case HIR::expr_::ExprKind::kId:
@@ -758,6 +833,37 @@ class SemaVisitor : public AST::BaseVisitor {
           return false;
         default:
           break;
+      }
+    }
+    return true;
+  }
+
+  // return whether an expression can be written to; check is_temporary() too
+  bool is_writeable(HIR::expr_t node) {
+    if (node != nullptr) {
+      switch (node->expr_kind) {
+        case HIR::expr_::ExprKind::kMember: {
+          HIR::Member_t mem = dynamic_cast<HIR::Member_t>(node);
+          return is_writeable(mem->value);
+        }
+        case HIR::expr_::ExprKind::kSubscript: {
+          HIR::Subscript_t sub = dynamic_cast<HIR::Subscript_t>(node);
+          return is_writeable(sub->value);
+        }
+        case HIR::expr_::ExprKind::kId: {
+          HIR::Id_t id = dynamic_cast<HIR::Id_t>(node);
+          HIR::resolved_t ref = id->ref;
+          if (ref == nullptr) {
+            return true;
+          }
+          if (ref->resolved_kind != HIR::resolved_::ResolvedKind::kDeclRef) {
+            return false;
+          }
+          HIR::DeclRef_t dr = dynamic_cast<HIR::DeclRef_t>(ref);
+          return dr->ref->dt == HIR::decltype_t::kVar;
+        }
+        default:
+          return true;
       }
     }
     return true;
@@ -1136,6 +1242,7 @@ class SemaVisitor : public AST::BaseVisitor {
     for (AST::declaration_t a: node->args) {
       HIR::declaration_t d = visit(a);
       d->traits = all_traits;
+      d->mode = HIR::compmode_t::kNormal;
       args.push_back(d);
     }
     // create shell now so body can have recursion
@@ -1276,7 +1383,7 @@ class SemaVisitor : public AST::BaseVisitor {
       Traits t = e ? e->traits : empty_traits;
       retinfo_stack_.top().emplace_back(dt, t);
     }
-    return HIR::Return(e);
+    return HIR::Return(e, get_comptime_literal(e));
   }
 
   antlrcpp::Any visitIf(AST::If_t node) override {
@@ -1331,6 +1438,11 @@ class SemaVisitor : public AST::BaseVisitor {
     for (AST::declaration_t p: node->decls) {
       HIR::declaration_t d = visit(p);
       d->dt = dt;
+      // mutablility removes all traits
+      if (dt == HIR::decltype_t::kVar) {
+        d->traits = empty_traits;
+        d->mode = HIR::compmode_t::kNormal;
+      }
       decls.push_back(d);
     }
     return HIR::Decl(dt, decls);
@@ -1340,15 +1452,16 @@ class SemaVisitor : public AST::BaseVisitor {
     HIR::expr_t target = visit(node->target);
     HIR::expr_t value = visit(node->value);
     if (is_temporary(target)) {
-      sema_err_ << "Error: target of assignment cannot be temporary";
-    }
-    if (!is_same_type(target->type, value->type)) {
+      sema_err_ << "Error: target of assignment cannot be temporary"
+                << std::endl;
+    } else if (!is_writeable(target)) {
+      sema_err_ << "Error: target of assignment is read only" << std::endl;
+    } else if (is_void_type(value->type)) {
+      sema_err_ << "Error: type 'void' is not assignable" << std::endl;
+    } else if (!is_same_type(target->type, value->type)) {
       sema_err_ << "Error: mismatched types in assignment: "
                 << to_string(target->type) << " vs " << to_string(value->type)
                 << std::endl;
-    }
-    if (is_void_type(value->type)) {
-      sema_err_ << "Error: type 'void' is not assignable" << std::endl;
     }
     return HIR::Assign(target, value);
   }
@@ -1735,7 +1848,8 @@ class SemaVisitor : public AST::BaseVisitor {
             new_args.push_back(
               HIR::declaration(def->args[i]->name, nullptr,
                                def->args[i]->value, def->args[i]->dt, type,
-                               empty_traits, HIR::compmode_t::kNormal, 0));
+                               empty_traits, HIR::compmode_t::kNormal,
+                               nullptr, 0));
           }
           // TODO recursively copy def's body (needs HIR visitor)
           std::vector<HIR::stmt_t> new_body;
@@ -1891,13 +2005,14 @@ class SemaVisitor : public AST::BaseVisitor {
     if (is_slice(slice)) {
       type = value->type;
       HIR::Slice_t s = dynamic_cast<HIR::Slice_t>(slice);
-      determine_traits_and_mode(ra_traits, {s->lower, s->upper, s->step},
+      determine_traits_and_mode(ra_traits,
+                                {value, s->lower, s->upper, s->step},
                                 traits, mode);
     }
     else {
       type = get_underlying_type(value->type);
       HIR::Index_t idx = dynamic_cast<HIR::Index_t>(slice);
-      determine_traits_and_mode(ra_traits, {idx->value}, traits, mode);
+      determine_traits_and_mode(ra_traits, {value, idx->value}, traits, mode);
     }
     return HIR::Subscript(value, slice, type, traits, mode, value->name);
   }
@@ -2110,10 +2225,10 @@ class SemaVisitor : public AST::BaseVisitor {
       mode = value->mode;
     }
     // construct reference if no errors occurred so far
-    HIR::declaration_t new_node = HIR::declaration(node->name, explicit_type,
-                                                   value,
-                                                   HIR::decltype_t::kLet,
-                                                   type, traits, mode, 0);
+    HIR::expr_t comptime_literal = get_comptime_literal(value);
+    HIR::declaration_t new_node =
+      HIR::declaration(node->name, explicit_type, value, HIR::decltype_t::kLet,
+                       type, traits, mode, comptime_literal, 0);
     if (sema_err_.str().size() == starting_err_length) {
       if (!store_symbol(node->name, HIR::DeclRef(new_node))) {
         sema_err_ << "Error: symbol " << node->name

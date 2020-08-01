@@ -1,6 +1,6 @@
 ## Regression tests for utils
 
-These regression tests parallel the functionality from the `utils` headers. To add a new test, simply add a rule to `CMakeLists.txt`.
+These regression tests cover the functionality from the `utils` headers. To add a new test, simply add a rule to `CMakeLists.txt`.
 
 All of these tests rely on the macros in `test.hpp`:
 
