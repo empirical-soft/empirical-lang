@@ -300,7 +300,9 @@ class CodegenVisitor : public HIR::BaseVisitor {
 
   antlrcpp::Any visitReturn(HIR::Return_t node) override {
     VVM::operand_t e = VVM::encode_operand(0, VVM::OpMask::kImmediate);
-    if (node->value != nullptr) {
+    if (node->comptime_literal != nullptr) {
+      e = visit(node->comptime_literal);
+    } else if (node->value != nullptr) {
       e = visit(node->value);
     }
     emit(VVM::opcodes::ret, {e});
@@ -367,7 +369,10 @@ class CodegenVisitor : public HIR::BaseVisitor {
       VVM::operand_t typee = get_type_operand(d->type);
       emit(VVM::opcodes::alloc, {typee, target});
 
-      if (d->value != nullptr) {
+      if (d->comptime_literal != nullptr) {
+        VVM::operand_t value = visit(d->comptime_literal);
+        emit(VVM::opcodes::assign, {value, typee, target});
+      } else if (d->value != nullptr) {
         // assign the value
         // TODO should "move" temporaries and "copy" otherwise
         VVM::operand_t value = visit(d->value);

@@ -60,3 +60,29 @@ Error: mismatched types in assignment: Int64 vs Float64
 Error: symbol my_float was not found
 
 ```
+
+### Assignment errors
+
+```
+>>> let x = 7
+
+>>> x = 8
+Error: target of assignment is read only
+
+>>> func foo(): return 1 end
+
+>>> foo = 7
+Error: target of assignment is read only
+
+>>> 3 = 7
+Error: target of assignment cannot be temporary
+
+>>> var y = 7
+
+>>> y = 8.0
+Error: mismatched types in assignment: Int64 vs Float64
+
+>>> y = print("Hello")
+Error: type 'void' is not assignable
+
+```

@@ -29,37 +29,143 @@ Stream
 
 ```
 
+### Variable
+
+```
+>>> let x = 7
+
+>>> var y = 7
+
+>>> traits_of(x + 3)
+pure, transform, linear
+
+>>> traits_of(y + 3)
+none
+
+>>> mode_of(x + 3)
+Comptime
+
+>>> mode_of(y + 3)
+Normal
+
+```
+
 ### List
 
 ```
 >>> traits_of([1, 2, 3])
 pure, transform, linear
 
+>>> traits_of([1, x, 3])
+pure, transform, linear
+
+>>> traits_of([1, y, 3])
+none
+
 >>> mode_of([1, 2, 3])
 Comptime
 
-```
-
-#### Variable
-
-```
->>> let x = 7
-
->>> traits_of(x + 3)
-pure, transform, linear
-
->>> mode_of(x + 3)
+>>> mode_of([1, x, 3])
 Comptime
+
+>>> mode_of([1, y, 3])
+Normal
+
+```
+
+### Subscript
+
+```
+>>> let xs = [1, 2, 3]
+
+>>> var ys = [1, 2, 3]
+
+>>> traits_of(xs[0])
+pure, transform
+
+>>> traits_of(xs[x])
+pure, transform
+
+>>> traits_of(xs[y])
+none
+
+>>> traits_of(ys[0])
+none
+
+>>> traits_of(ys[x])
+none
+
+>>> traits_of(ys[y])
+none
+
+>>> mode_of(xs[0])
+Comptime
+
+>>> mode_of(xs[x])
+Comptime
+
+>>> mode_of(xs[y])
+Normal
+
+>>> mode_of(ys[0])
+Normal
+
+>>> mode_of(ys[x])
+Normal
+
+>>> mode_of(ys[y])
+Normal
 
 ```
 
 ### Type
 
 ```
+>>> data Person: name: String, age: Int64 end
+
+>>> let p = Person("a", 1)
+
 >>> traits_of(Int64)
-none
+pure, transform, linear
+
+>>> traits_of(Person)
+pure, transform, linear
+
+>>> traits_of(p)
+pure, transform, linear
 
 >>> mode_of(Int64)
+Comptime
+
+>>> mode_of(Person)
+Comptime
+
+>>> mode_of(p)
+Comptime
+
+>>> traits_of(Int64("7"))
+pure, transform, linear
+
+>>> mode_of(Int64("7"))
+Comptime
+
+```
+
+### Member
+
+```
+>>> let py = Person("a", y)
+
+>>> traits_of(p.name)
+pure, transform, linear
+
+>>> traits_of(py.name)
+none
+
+>>> mode_of(p.name)
+Comptime
+
+>>> mode_of(py.name)
 Normal
 
 ```
@@ -72,8 +178,17 @@ Normal
 >>> traits_of(inc)
 pure, transform, linear
 
+>>> mode_of(inc)
+Comptime
+
 >>> mode_of(inc(5))
 Comptime
+
+>>> mode_of(inc(x))
+Comptime
+
+>>> mode_of(inc(y))
+Normal
 
 ```
 
@@ -88,6 +203,9 @@ transform, linear
 >>> traits_of(prices.volume)
 transform, linear
 
+>>> traits_of(prices.volume[0])
+transform
+
 >>> traits_of(prices.volume + 1)
 transform, linear
 
@@ -99,6 +217,9 @@ Stream
 
 >>> mode_of(prices.volume)
 Stream
+
+>>> mode_of(prices.volume[0])
+Normal
 
 >>> mode_of(prices.volume + 1)
 Stream
@@ -115,6 +236,14 @@ Normal
 Stream
 
 >>> mode_of(sort prices by volume)
+Normal
+
+```
+
+### Miscellaneous
+
+```
+>>> mode_of(now())
 Normal
 
 ```
