@@ -38,6 +38,7 @@ module HIR
        | TraitsOf(expr arg, string s)
        | ModeOf(expr arg, string s)
        | Columns(expr arg, string s)
+       | Compile(expr arg, stmt* body)
        | Member(expr value, identifier member, resolved ref)
        | Subscript(expr value, slice slice)
        | UserDefinedLiteral(expr literal, identifier suffix, resolved ref)

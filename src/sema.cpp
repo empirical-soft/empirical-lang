@@ -1088,7 +1088,8 @@ class SemaVisitor : public AST::BaseVisitor {
     kTypeOf,
     kTraitsOf,
     kModeOf,
-    kColumns
+    kColumns,
+    kCompile
   };
 
   // try to internally invoke function; return nullptr if unable
@@ -1113,6 +1114,9 @@ class SemaVisitor : public AST::BaseVisitor {
           }
           case SemaCodes::kColumns: {
             return sema_function_columns(args);
+          }
+          case SemaCodes::kCompile: {
+            return sema_function_compile(args);
           }
         }
       }
@@ -1172,6 +1176,42 @@ class SemaVisitor : public AST::BaseVisitor {
                         HIR::compmode_t::kComptime, a->name);
   }
 
+  // compile() function
+  HIR::expr_t sema_function_compile(const std::vector<HIR::expr_t>& args) {
+    HIR::expr_t a = args[0];
+    std::vector<HIR::stmt_t> body;
+    HIR::datatype_t typee = HIR::Void();
+    Traits traits = all_traits;
+    HIR::compmode_t mode = HIR::compmode_t::kComptime;
+
+    // must derive the string at compile time
+    HIR::expr_t literal = get_comptime_literal(a);
+    if (literal == nullptr || !is_string_type(literal->type)) {
+      sema_err_ << "Error: compile() requires a comptime string" << std::endl;
+    }
+    else {
+      HIR::Str_t str = dynamic_cast<HIR::Str_t>(literal);
+      AST::mod_t ast = parse(str->s, true, false);
+      HIR::mod_t hir = sema(ast, true, false);
+      HIR::Module_t mod = dynamic_cast<HIR::Module_t>(hir);
+      body = std::move(mod->body);
+
+      // if last stmt is a non-void expr, then capture its type/traits/mode
+      auto last_stmt = body.back();
+      if (last_stmt->stmt_kind == HIR::stmt_::StmtKind::kExpr) {
+        HIR::Expr_t e = dynamic_cast<HIR::Expr_t>(last_stmt);
+        HIR::datatype_t dt = e->value->type;
+        if (!is_void_type(dt)) {
+          HIR::expr_t value = e->value;
+          typee = value->type;
+          traits = value->traits;
+          mode = value->mode;
+        }
+      }
+    }
+    return HIR::Compile(a, body, typee, traits, mode, a->name);
+  }
+
   // save all builtin items so that id resolution will find them
   void save_builtins() {
     store_symbol("type_of", HIR::SemaRef(size_t(SemaCodes::kTypeOf),
@@ -1184,6 +1224,9 @@ class SemaVisitor : public AST::BaseVisitor {
       HIR::FuncType({nullptr}, HIR::Void(), all_traits)));
 
     store_symbol("columns", HIR::SemaRef(size_t(SemaCodes::kColumns),
+      HIR::FuncType({nullptr}, HIR::Void(), all_traits)));
+
+    store_symbol("compile", HIR::SemaRef(size_t(SemaCodes::kCompile),
       HIR::FuncType({nullptr}, HIR::Void(), all_traits)));
 
     store_symbol("store", HIR::CompilerRef(size_t(CompilerCodes::kStore),

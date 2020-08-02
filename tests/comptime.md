@@ -48,3 +48,24 @@ Comptime
 Comptime
 
 ```
+
+### compile()
+
+```
+>>> let op = "+"
+
+>>> compile("2" + op + "3")
+5
+
+>>> compile("data Person: name: String, age: Int64 end")
+
+>>> Person("a", 1)
+ name age
+    a   1
+
+>>> compile("func inc(x: Int64): return x + 1 end")
+
+>>> inc(4)
+5
+
+```
