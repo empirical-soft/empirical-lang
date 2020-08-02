@@ -825,6 +825,15 @@ class CodegenVisitor : public HIR::BaseVisitor {
     return direct_repr(node->s);
   }
 
+  antlrcpp::Any visitCompile(HIR::Compile_t node) override {
+    VVM::operand_t last_stmt_value;
+    for (HIR::stmt_t s: node->body) {
+      VVM::operand_t op = visit(s);
+      last_stmt_value = op;
+    }
+    return last_stmt_value;
+  }
+
   antlrcpp::Any visitMember(HIR::Member_t node) override {
     // implied members should have saved the source's register already
     auto iter = implied_reg_map_.find(node->value);
