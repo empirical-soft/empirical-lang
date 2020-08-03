@@ -1,0 +1,25 @@
+# These examples are run via compile-time function evaluation.
+# Enable --dump-vvm to see how the comptime values have been elided.
+
+func inc(x: Int64):
+  return x + 1
+end
+
+let x = inc(7)
+print(x)
+##8
+
+data Person:
+  name: String,
+  age: Int64
+end
+
+let p = Person("a", 1)
+let y = p.age
+print(y)
+##1
+
+let z = compile("x + y")
+print(z)
+##9
+

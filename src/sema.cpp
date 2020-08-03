@@ -21,6 +21,8 @@
 #include <VVM/opcodes.h>
 #include <VVM/utils/csv_infer.hpp>
 
+extern bool kDumpVvm;
+
 // build high-level IR (HIR) from abstract syntax tree (AST)
 class SemaVisitor : public AST::BaseVisitor {
   // store all prior IR
@@ -186,6 +188,14 @@ class SemaVisitor : public AST::BaseVisitor {
       }
     }
     return nullptr;
+  }
+
+  // send a statement to VVM now so that comptime expressions can have it
+  void send_to_vvm(HIR::stmt_t node) {
+    HIR::mod_t wrapper = HIR::Module({node}, "");
+    VVM::Program program = codegen(wrapper, true, kDumpVvm);
+    (void) VVM::interpret(program);
+    return;
   }
 
   /* get info from a node */
@@ -1357,13 +1367,15 @@ class SemaVisitor : public AST::BaseVisitor {
                   << node->name << std::endl;
       }
     }
-    // remove from scope if an error had occured
-    if (sema_err_.str().size() > starting_err_length) {
-      remove_symbol_ref(node->name, ref);
-    }
     // put everything together
     fd->rettype = rettype;
     fd->traits = traits;
+    if (sema_err_.str().size() == starting_err_length) {
+      send_to_vvm(new_node);
+    } else {
+      // remove from scope if an error had occured
+      remove_symbol_ref(node->name, ref);
+    }
     return generic ? generic : new_node;
   }
 
@@ -1373,9 +1385,12 @@ class SemaVisitor : public AST::BaseVisitor {
       sema_err_ << "Error: type name " << node->name
                 << " must begin with upper-case letter" << std::endl;
     }
+    // create shell now if we ever have recursive type definitions
     std::vector<HIR::declaration_t> body;
     HIR::stmt_t new_node = HIR::DataDef(node->name, body, 0);
+    HIR::DataDef_t dd = dynamic_cast<HIR::DataDef_t>(new_node);
     HIR::resolved_t ref = HIR::DataRef(new_node);
+    // store name in current scope
     if (!store_symbol(node->name, ref)) {
       sema_err_ << "Error: symbol " << node->name
                 << " was already defined" << std::endl;
@@ -1390,14 +1405,15 @@ class SemaVisitor : public AST::BaseVisitor {
       body.push_back(d);
     }
     pop_scope();
-    // remove from scope if an error had occured
-    if (sema_err_.str().size() > starting_err_length) {
-      remove_symbol_ref(node->name, ref);
-    }
     // put everything together
-    HIR::DataDef_t dd = dynamic_cast<HIR::DataDef_t>(new_node);
     dd->body = body;
     dd->scope = scope;
+    if (sema_err_.str().size() == starting_err_length) {
+      send_to_vvm(new_node);
+    } else {
+      // remove from scope if an error had occured
+      remove_symbol_ref(node->name, ref);
+    }
     return new_node;
   }
 
@@ -1465,7 +1481,7 @@ class SemaVisitor : public AST::BaseVisitor {
 
   antlrcpp::Any visitDecl(AST::Decl_t node) override {
     HIR::decltype_t dt = visit(node->dt);
-    std::vector<HIR::declaration_t> decls;
+    std::vector<HIR::declaration_t> decls, comptime_decls;
     for (AST::declaration_t p: node->decls) {
       HIR::declaration_t d = visit(p);
       d->dt = dt;
@@ -1475,6 +1491,12 @@ class SemaVisitor : public AST::BaseVisitor {
         d->mode = HIR::compmode_t::kNormal;
       }
       decls.push_back(d);
+      if (d->mode == HIR::compmode_t::kComptime) {
+        comptime_decls.push_back(d);
+      }
+    }
+    if (!comptime_decls.empty()) {
+      send_to_vvm(HIR::Decl(dt, comptime_decls));
     }
     return HIR::Decl(dt, decls);
   }

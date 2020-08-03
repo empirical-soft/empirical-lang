@@ -20,7 +20,7 @@
 #include <libgen.h>
 #endif  // WIN32
 
-extern bool testing_mode;
+extern bool kTestingMode;
 
 /**
  * Returns the number of rows and columns in terminal
@@ -31,7 +31,7 @@ void get_terminal_size(size_t& rows_out, size_t& cols_out) {
   cols_out = 80;
 
   // continuous integration may have inconsistent window sizes
-  if (testing_mode) {
+  if (kTestingMode) {
     return;
   }
 
