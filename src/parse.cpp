@@ -51,8 +51,7 @@ class ParseVisitor : public EmpiricalVisitor {
     for (size_t i = 0; i < str.size(); i++) {
       if (str[i] != '\\') {
         result += str[i];
-      }
-      else {
+      } else {
         if (i + 1 < str.size()) {
           i++;
           char c = str[i];
@@ -579,16 +578,13 @@ class ParseVisitor : public EmpiricalVisitor {
         } else {
           e = AST::FunctionCall(e, args);
         }
-      }
-      else if (trailer->subscript()) {
+      } else if (trailer->subscript()) {
         AST::slice_t slice = visit(trailer->subscript());
         e = AST::Subscript(e, slice);
-      }
-      else if (trailer->NAME()) {
+      } else if (trailer->NAME()) {
         AST::identifier name(trailer->NAME()->getText());
         e = AST::Member(e, name);
-      }
-      else {
+      } else {
         // empty template instantiation or function call
         std::vector<AST::expr_t> args;
         if (trailer->getText()[0] == '$') {
