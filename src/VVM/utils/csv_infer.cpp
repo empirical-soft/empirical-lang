@@ -156,28 +156,21 @@ std::string infer_col(const std::string& header,
   // try each converter to see what works
   if (is_all_empty(xs)) {
     ret += "String";
-  }
-  else if (is_int64(xs)) {
+  } else if (is_int64(xs)) {
     ret += "Int64";
-  }
-  else if (is_float64(xs)) {
+  } else if (is_float64(xs)) {
     ret += "Float64";
-  }
-  else if (is_bool(xs)) {
+  } else if (is_bool(xs)) {
     ret += "Bool";
-  }
-  else {
+  } else {
     auto formats = infer_all_strtime_formats(xs);
     if (is_time(formats)) {
       ret += "Time";
-    }
-    else if (is_date(formats)) {
+    } else if (is_date(formats)) {
       ret += "Date";
-    }
-    else if (is_timestamp(formats)) {
+    } else if (is_timestamp(formats)) {
       ret += "Timestamp";
-    }
-    else {
+    } else {
       ret += "String";
     }
   }

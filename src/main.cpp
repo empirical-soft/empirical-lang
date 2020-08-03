@@ -130,12 +130,10 @@ Options:
         if (starts_with(line, "t ", 1)) {
           timer_desired = true;
           line = line.substr(3);
-        }
-        else if (starts_with(line, "time ", 1)) {
+        } else if (starts_with(line, "time ", 1)) {
           timer_desired = true;
           line = line.substr(6);
-        }
-        else if (starts_with(line, "l ", 1)) {
+        } else if (starts_with(line, "l ", 1)) {
           std::string contents;
           try {
             contents = read_file(line.substr(3));
@@ -145,8 +143,7 @@ Options:
             std::cerr << e.what() << std::endl;
           }
           line.clear();
-        }
-        else if (starts_with(line, "load ", 1)) {
+        } else if (starts_with(line, "load ", 1)) {
           std::string contents;
           try {
             contents = read_file(line.substr(6));
@@ -156,11 +153,9 @@ Options:
             std::cerr << e.what() << std::endl;
           }
           line.clear();
-        }
-        else if (starts_with(line, "multiline", 1)) {
+        } else if (starts_with(line, "multiline", 1)) {
           line = read_multiline();
-        }
-        else if (starts_with(line, "help", 1)) {
+        } else if (starts_with(line, "help", 1)) {
           std::cout << R"(Magic commands:
   \t <expr>, \time <expr> - time execution of an expression
   \l <file>, \load <file> - load a file into global scope
@@ -168,8 +163,7 @@ Options:
   \help                   - print this message)"
                     << std::endl;
           line.clear();
-        }
-        else {
+        } else {
           std::cerr << "Error: unrecognized magic command " << line
                     << std::endl;
           line.clear();
@@ -196,8 +190,7 @@ Options:
         std::cout << std::endl;
       }
     }
-  }
-  else if (!md_file.empty()) {
+  } else if (!md_file.empty()) {
     // verify mode
     testing_mode = true;
     Tests tests;
@@ -228,15 +221,13 @@ Options:
         ret_code = 1;
       }
     }
-  }
-  else {
+  } else {
     // file mode
     try {
       std::string contents = read_file(filename);
       if (ends_with(filename, ".vvm")) {
         eval_asm(contents, dump_vvm);
-      }
-      else {
+      } else {
         eval(contents, false, dump_ast, dump_hir, dump_vvm);
       }
     }

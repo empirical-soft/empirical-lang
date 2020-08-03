@@ -1213,8 +1213,7 @@ WRAPPER_V_S(count)
       auto iter = m.find(k);
       if (iter == m.end()) {
         v = m[k] = count++;
-      }
-      else {
+      } else {
         v = iter->second;
       }
       labs[i] += v * stride;
@@ -1244,8 +1243,7 @@ WRAPPER_V_S(count)
       auto iter = m.find(k);
       if (iter == m.end()) {
         v = m[k] = count++;
-      }
-      else {
+      } else {
         v = iter->second;
       }
       llabs[i] += v * stride;
@@ -1258,8 +1256,7 @@ WRAPPER_V_S(count)
       auto iter = m.find(k);
       if (iter == m.end()) {
         v = m[k] = count++;
-      }
-      else {
+      } else {
         v = iter->second;
       }
       rlabs[i] += v * stride;
@@ -1555,8 +1552,7 @@ WRAPPER_V_S(count)
                  right_values[right_pos] <= left_values[left_pos]) {
             right_pos++;
           }
-        }
-        else {
+        } else {
           while (right_pos < right_values.size() &&
                  right_values[right_pos] < left_values[left_pos]) {
             right_pos++;
@@ -1579,8 +1575,7 @@ WRAPPER_V_S(count)
             right_indices[left_pos] = right_pos;
             left_pos++;
           }
-        }
-        else {
+        } else {
           while (left_pos < left_values.size() &&
                  left_values[left_pos] < right_values[right_pos]) {
             right_indices[left_pos] = right_pos;
@@ -1633,14 +1628,12 @@ WRAPPER_V_S(count)
             DiffType p = left_values[left_pos] - right_values[prev_pos];
             DiffType n = right_values[next_pos] - left_values[left_pos];
             right_indices[left_pos] = (p <= n) ? prev_pos : next_pos;
-          }
-          else {
+          } else {
             right_indices[left_pos] = next_pos;
           }
           left_pos++;
         }
-      }
-      else {
+      } else {
         // save position as the desired index
         right_indices[left_pos] = prev_pos;
         left_pos++;
@@ -1673,8 +1666,7 @@ WRAPPER_V_S(count)
                  right_values[right_pos] <= left_values[left_pos]) {
             right_pos++;
           }
-        }
-        else {
+        } else {
           while (right_pos < right_values.size() &&
                  right_values[right_pos] < left_values[left_pos]) {
             right_pos++;
@@ -1706,8 +1698,7 @@ WRAPPER_V_S(count)
             }
             left_pos++;
           }
-        }
-        else {
+        } else {
           while (left_pos < left_values.size() &&
                  left_values[left_pos] < right_values[right_pos]) {
             DiffType diff = right_values[right_pos] - left_values[left_pos];
@@ -1744,14 +1735,12 @@ WRAPPER_V_S(count)
                 if (p <= within) {
                   right_indices[left_pos] = prev_pos;
                 }
-              }
-              else {
+              } else {
                 if (n <= within) {
                   right_indices[left_pos] = next_pos;
                 }
               }
-            }
-            else {
+            } else {
               DiffType diff = right_values[next_pos] - left_values[left_pos];
               if (diff <= within) {
                 right_indices[left_pos] = next_pos;
@@ -1759,8 +1748,7 @@ WRAPPER_V_S(count)
             }
             left_pos++;
           }
-        }
-        else {
+        } else {
           if (prev_pos != -1) {
             DiffType diff = left_values[left_pos] - right_values[prev_pos];
             if (diff <= within) {
@@ -1815,8 +1803,7 @@ WRAPPER_V_S(count)
                 m[rlabs[right_pos]] = right_pos;
                 right_pos++;
               }
-            }
-            else {
+            } else {
               while (right_pos < right_values.size() &&
                      right_values[right_pos] < left_values[left_pos]) {
                 m[rlabs[right_pos]] = right_pos;
@@ -1844,8 +1831,7 @@ WRAPPER_V_S(count)
                 m[llabs[left_pos]].push_back(left_pos);
                 left_pos++;
               }
-            }
-            else {
+            } else {
               while (left_pos < left_values.size() &&
                      left_values[left_pos] < right_values[right_pos]) {
                 m[llabs[left_pos]].push_back(left_pos);
@@ -1942,16 +1928,14 @@ WRAPPER_V_S(count)
                   DiffType n = right_values[next_pos] - left_values[pos];
                   right_indices[pos] = (p <= n) ? prev_pos : next_pos;
                 }
-              }
-              else {
+              } else {
                 for (int64_t pos: next_iter->second) {
                   right_indices[pos] = next_pos;
                 }
               }
               ml.erase(next_iter);
             }
-          }
-          else {
+          } else {
             // save last-seen position as the desired index
             auto iter = mr.find(llabs[left_pos]);
             if (iter != mr.end()) {
@@ -2008,8 +1992,7 @@ WRAPPER_V_S(count)
                 m[rlabs[right_pos]] = right_pos;
                 right_pos++;
               }
-            }
-            else {
+            } else {
               while (right_pos < right_values.size() &&
                      right_values[right_pos] < left_values[left_pos]) {
                 m[rlabs[right_pos]] = right_pos;
@@ -2041,8 +2024,7 @@ WRAPPER_V_S(count)
                 m[llabs[left_pos]].push_back(left_pos);
                 left_pos++;
               }
-            }
-            else {
+            } else {
               while (left_pos < left_values.size() &&
                      left_values[left_pos] < right_values[right_pos]) {
                 m[llabs[left_pos]].push_back(left_pos);
@@ -2108,15 +2090,13 @@ WRAPPER_V_S(count)
                       if (p <= within) {
                         right_indices[pos] = prev_pos;
                       }
-                    }
-                    else {
+                    } else {
                       if (n <= within) {
                         right_indices[pos] = next_pos;
                       }
                     }
                   }
-                }
-                else {
+                } else {
                   for (int64_t pos: next_iter->second) {
                     DiffType diff = right_values[next_pos] - left_values[pos];
                     if (diff <= within) {
@@ -2126,8 +2106,7 @@ WRAPPER_V_S(count)
                 }
                 ml.erase(next_iter);
               }
-            }
-            else {
+            } else {
               // save last-seen position as the desired index if 'within' is met
               auto iter = mr.find(llabs[left_pos]);
               if (iter != mr.end()) {

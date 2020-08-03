@@ -58,8 +58,7 @@ type_t encode_type(const std::string& s) {
   if (s[0] == '$') {
     result = std::stol(&s[1]);
     mask = TypeMask::kUserDefined;
-  }
-  else {
+  } else {
     result = encode_vvm_type(s);
     mask = TypeMask::kBuiltIn;
   }
@@ -143,16 +142,13 @@ operand_t encode_operand(const std::string& s) {
   if (std::isdigit(s[0])) {
     result = std::stol(s);
     mask = OpMask::kImmediate;
-  }
-  else if (s[0] == '%') {
+  } else if (s[0] == '%') {
     result = std::stol(&s[1]);
     mask = OpMask::kLocal;
-  }
-  else if (s[0] == '@') {
+  } else if (s[0] == '@') {
     result = std::stol(&s[1]);
     mask = OpMask::kGlobal;
-  }
-  else {
+  } else {
     result = encode_type(s);
     mask = OpMask::kType;
   }

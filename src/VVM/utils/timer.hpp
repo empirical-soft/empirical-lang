@@ -60,20 +60,16 @@ class Timer {
     int64_t result;
     if (unit == "ns") {
       result = diff.count();
-    }
-    else if (unit == "us") {
+    } else if (unit == "us") {
       result =
         std::chrono::duration_cast<std::chrono::microseconds>(diff).count();
-    }
-    else if (unit == "ms") {
+    } else if (unit == "ms") {
       result =
         std::chrono::duration_cast<std::chrono::milliseconds>(diff).count();
-    }
-    else if (unit == "s") {
+    } else if (unit == "s") {
       result =
         std::chrono::duration_cast<std::chrono::seconds>(diff).count();
-    }
-    else {
+    } else {
       throw std::logic_error("Unknown unit " + unit);
     }
 
@@ -105,20 +101,16 @@ class Profiler {
     int64_t result;
     if (unit == "ns") {
       result = diff.count();
-    }
-    else if (unit == "us") {
+    } else if (unit == "us") {
       result =
         std::chrono::duration_cast<std::chrono::microseconds>(diff).count();
-    }
-    else if (unit == "ms") {
+    } else if (unit == "ms") {
       result =
         std::chrono::duration_cast<std::chrono::milliseconds>(diff).count();
-    }
-    else if (unit == "s") {
+    } else if (unit == "s") {
       result =
         std::chrono::duration_cast<std::chrono::seconds>(diff).count();
-    }
-    else {
+    } else {
       throw std::logic_error("Unknown unit " + unit);
     }
 

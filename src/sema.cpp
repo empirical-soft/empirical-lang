@@ -75,8 +75,7 @@ class SemaVisitor : public AST::BaseVisitor {
         (contains_trait(func_traits, SingleTrait::kLinear) &&
          arg_mode == HIR::compmode_t::kStream)) {
       mode = HIR::compmode_t::kStream;
-    }
-    else if (contains_trait(func_traits, SingleTrait::kPure) &&
+    } else if (contains_trait(func_traits, SingleTrait::kPure) &&
              arg_mode == HIR::compmode_t::kComptime) {
       mode = HIR::compmode_t::kComptime;
     }
@@ -413,8 +412,7 @@ class SemaVisitor : public AST::BaseVisitor {
       }
       if (i != 0) {
         i = scope.previous_scope;
-      }
-      else {
+      } else {
         done = true;
       }
     }
@@ -444,15 +442,13 @@ class SemaVisitor : public AST::BaseVisitor {
           if (interactive_ && is_overridable(resolveds[i])) {
             resolveds[i] = ptr;
             return true;
-          }
-          else {
+          } else {
             return false;
           }
         }
       }
       resolveds.push_back(ptr);
-    }
-    else {
+    } else {
       scope.map.emplace(symbol, std::initializer_list<HIR::resolved_t>{ptr});
     }
     return true;
@@ -973,8 +969,7 @@ class SemaVisitor : public AST::BaseVisitor {
     if (args.size() != argtypes.size()) {
       oss << "wrong number of arguments; expected " << argtypes.size()
           << " but got " << args.size();
-    }
-    else {
+    } else {
       for (size_t i = 0; i < args.size(); i++) {
         if (!is_same_type(args[i]->type, argtypes[i])) {
           oss << "argument type at position " << i << " does not match: "
@@ -1017,8 +1012,7 @@ class SemaVisitor : public AST::BaseVisitor {
       std::string new_item = name + ": " + to_string(dt);
       if (result.empty()) {
         result = new_item;
-      }
-      else {
+      } else {
         result += ", " + new_item;
       }
     }
@@ -1037,8 +1031,7 @@ class SemaVisitor : public AST::BaseVisitor {
       std::string new_item = d->name + ": " + to_string(dt);
       if (result.empty()) {
         result = new_item;
-      }
-      else {
+      } else {
         result += sep + new_item;
       }
     }
@@ -1073,8 +1066,7 @@ class SemaVisitor : public AST::BaseVisitor {
         std::string new_item = d->name + ": " + to_string(dt);
         if (result.empty()) {
           result = new_item;
-        }
-        else {
+        } else {
           result += ", " + new_item;
         }
       }
@@ -1188,8 +1180,7 @@ class SemaVisitor : public AST::BaseVisitor {
     HIR::expr_t literal = get_comptime_literal(a);
     if (literal == nullptr || !is_string_type(literal->type)) {
       sema_err_ << "Error: compile() requires a comptime string" << std::endl;
-    }
-    else {
+    } else {
       HIR::Str_t str = dynamic_cast<HIR::Str_t>(literal);
       AST::mod_t ast = parse(str->s, true, false);
       HIR::mod_t hir = sema(ast, true, false);
@@ -1271,8 +1262,7 @@ class SemaVisitor : public AST::BaseVisitor {
     if (explicit_rettype != nullptr) {
       if (is_kind_type(explicit_rettype->type)) {
         rettype = get_underlying_type(explicit_rettype->type);
-      }
-      else {
+      } else {
         sema_err_ << "Error: return type for " << node->name
                   << " has invalid type" << std::endl;
       }
@@ -1326,8 +1316,7 @@ class SemaVisitor : public AST::BaseVisitor {
     if (retinfos.empty()) {
       sema_err_ << "Error: function " << node->name
                 << " has no return statements" << std::endl;
-    }
-    else {
+    } else {
       body_rettype = retinfos[0].type;
       traits = retinfos[0].traits;
       for (size_t i = 1; i < retinfos.size(); i++) {
@@ -1420,8 +1409,7 @@ class SemaVisitor : public AST::BaseVisitor {
     if (retinfo_stack_.empty()) {
       sema_err_ << "Error: return statement is not in function body"
                 << std::endl;
-    }
-    else {
+    } else {
       HIR::datatype_t dt = e ? e->type : HIR::Void();
       Traits t = e ? e->traits : empty_traits;
       retinfo_stack_.top().emplace_back(dt, t);
@@ -1567,8 +1555,7 @@ class SemaVisitor : public AST::BaseVisitor {
       std::string type_name = anon_func_name();
       (void) create_datatype(type_name, ts);
       type = make_dataframe('!' + type_name);
-    }
-    else {
+    } else {
       if (!by.empty()) {
         sema_err_ << "Error: must express aggregation if 'by' is listed"
                   << std::endl;
@@ -1906,16 +1893,14 @@ class SemaVisitor : public AST::BaseVisitor {
           HIR::datatype_t new_func_type = get_type(node);
           func = HIR::Id(def->name, ref, new_func_type, empty_traits,
                          HIR::compmode_t::kNormal, def->name);
-        }
-        else {
+        } else {
           sema_err_ << "Error: " << err_msg << std::endl;
         }
       }
-    }
-    // check for overloaded functions
-    // TODO we will eventually want specialization of generic functions
-    // TODO handle higher-order overloaded functions
-    else if (is_overloaded(func)) {
+    } else if (is_overloaded(func)) {
+      // check for overloaded functions
+      // TODO we will eventually want specialization of generic functions
+      // TODO handle higher-order overloaded functions
       HIR::OverloadedId_t id = dynamic_cast<HIR::OverloadedId_t>(func);
       std::string err_msg;
       size_t counted_mismatch = 0;
@@ -1929,8 +1914,7 @@ class SemaVisitor : public AST::BaseVisitor {
                          HIR::compmode_t::kNormal, id->s);
           err_msg.clear();
           break;
-        }
-        else {
+        } else {
           counted_mismatch++;
           if (counted_mismatch <= max_counted) {
             err_msg += "\n  candidate: " + to_string(func_type) + "\n    "
@@ -1947,9 +1931,8 @@ class SemaVisitor : public AST::BaseVisitor {
         sema_err_ << "Error: unable to match overloaded function " << id->s
                   << err_msg << std::endl;
       }
-    }
-    // regular (non-overloaded, non-generic) function
-    else {
+    } else {
+      // regular (non-overloaded, non-generic) function
       std::string err_msg = match_args(args, func->type);
       if (!err_msg.empty()) {
         sema_err_ << "Error: " << err_msg << std::endl;
@@ -2004,8 +1987,7 @@ class SemaVisitor : public AST::BaseVisitor {
         type_name = "Provider$" + filename;
         HIR::stmt_t datatype = create_datatype(type_name, typestr);
         resolutions.push_back(datatype);
-      }
-      else {
+      } else {
         sema_err_ << "Error: 'load' expects a String parameter" << std::endl;
       }
     }
@@ -2051,8 +2033,7 @@ class SemaVisitor : public AST::BaseVisitor {
       determine_traits_and_mode(ra_traits,
                                 {value, s->lower, s->upper, s->step},
                                 traits, mode);
-    }
-    else {
+    } else {
       type = get_underlying_type(value->type);
       HIR::Index_t idx = dynamic_cast<HIR::Index_t>(slice);
       determine_traits_and_mode(ra_traits, {value, idx->value}, traits, mode);
@@ -2159,8 +2140,7 @@ class SemaVisitor : public AST::BaseVisitor {
       if (values.size() >= 2) {
         sema_err_ << "Error: only one type allowed for lists" << std::endl;
       }
-    }
-    else {
+    } else {
       type = HIR::Array(expected);
     }
     Traits traits = intersect_traits(values);
@@ -2235,8 +2215,7 @@ class SemaVisitor : public AST::BaseVisitor {
     if (explicit_type != nullptr) {
       if (is_kind_type(explicit_type->type)) {
         type = get_underlying_type(explicit_type->type);
-      }
-      else {
+      } else {
         sema_err_ << "Error: declaration for " << node->name
                   << " has invalid type" << std::endl;
       }

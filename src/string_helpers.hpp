@@ -29,6 +29,7 @@ bool ends_with(const std::string& left, const std::string& right) {
   return false;
 }
 
+// remove surrounding white space
 std::string trim(const std::string& str) {
   size_t start = str.find_first_not_of(" \t\n");
   size_t end = str.find_last_not_of(" \t\n");
@@ -84,14 +85,12 @@ Tests parse_markdown(const std::string& contents) {
 
         // combined test
         tests.push_back({in, out});
-      }
-      else {
+      } else {
         std::ostringstream oss;
         oss << "Error: prompt expected on line " << line;
         throw std::logic_error(oss.str());
       }
-    }
-    else {
+    } else {
       // raw text is ignored
       while (i < contents.size() && !starts_with(contents, TICKS, i)) {
         while (i < contents.size() && contents[i++] != '\n')

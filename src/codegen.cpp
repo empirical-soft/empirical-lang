@@ -229,8 +229,7 @@ class CodegenVisitor : public HIR::BaseVisitor {
             last_stmt_value = repr_value;
           }
         }
-      }
-      else {
+      } else {
         // the string to save was already generated
         emit(VVM::opcodes::save, {last_stmt_value});
       }
@@ -318,8 +317,7 @@ class CodegenVisitor : public HIR::BaseVisitor {
         visit(b);
       }
       use_block(end);
-    }
-    else {
+    } else {
       auto next = new_block();
       auto end = new_block();
       VVM::operand_t cond = visit(node->test);
@@ -428,7 +426,8 @@ class CodegenVisitor : public HIR::BaseVisitor {
       for (size_t i = 0; i < node->by.size(); i++) {
         HIR::expr_t b = node->by[i]->value;
         VVM::operand_t by = visit(b);
-        VVM::operand_t offset = VVM::encode_operand(i, VVM::OpMask::kImmediate);
+        VVM::operand_t offset =
+          VVM::encode_operand(i, VVM::OpMask::kImmediate);
         VVM::operand_t dst = reserve_space();
         emit(VVM::opcodes::member, {by_table, offset, dst});
         VVM::operand_t typee = get_type_operand(b->type);
@@ -465,8 +464,7 @@ class CodegenVisitor : public HIR::BaseVisitor {
         emit(VVM::opcodes::member, {groups, counter, sub_table});
         assign_opcode = VVM::opcodes::append;
         num_leading_cols = number_of_fields(node->by_type);
-      }
-      else {
+      } else {
         emit(VVM::opcodes::alloc, {typee, result});
       }
       for (size_t i = 0; i < node->cols.size(); i++) {
@@ -617,15 +615,13 @@ class CodegenVisitor : public HIR::BaseVisitor {
         emit(VVM::opcodes::asofmatch, {left_asof_typee, left_asof_value,
                                        right_asof_value, strict, direction,
                                        left_indices, right_indices});
-      }
-      else if (node->within == nullptr) {
+      } else if (node->within == nullptr) {
         left_indices = reserve_space();
         right_indices = reserve_space();
         emit(VVM::opcodes::asofnear, {left_asof_typee, left_asof_value,
                                       right_asof_value, strict, direction,
                                       left_indices, right_indices});
-      }
-      else {
+      } else {
         within = visit(node->within);
         left_indices = reserve_space();
         right_indices = reserve_space();
@@ -644,8 +640,7 @@ class CodegenVisitor : public HIR::BaseVisitor {
                                          left_asof_value, right_asof_value,
                                          strict, direction,
                                          left_indices, right_indices});
-      }
-      else if (node->within == nullptr) {
+      } else if (node->within == nullptr) {
         left_indices = reserve_space();
         right_indices = reserve_space();
         emit(VVM::opcodes::eqasofnear, {left_on_typee, left_on_table,
@@ -653,8 +648,7 @@ class CodegenVisitor : public HIR::BaseVisitor {
                                         left_asof_value, right_asof_value,
                                         strict, direction,
                                         left_indices, right_indices});
-      }
-      else {
+      } else {
         within = visit(node->within);
         left_indices = reserve_space();
         right_indices = reserve_space();
@@ -714,9 +708,9 @@ class CodegenVisitor : public HIR::BaseVisitor {
     }
     if (node->func->expr_kind == HIR::expr_::ExprKind::kId) {
       HIR::Id_t id = dynamic_cast<HIR::Id_t>(node->func);
-      // handle compiler functions
       if (id->ref->resolved_kind ==
           HIR::resolved_::ResolvedKind::kCompilerRef) {
+        // handle compiler functions
         HIR::CompilerRef_t ptr = dynamic_cast<HIR::CompilerRef_t>(id->ref);
         CompilerCodes code = CompilerCodes(ptr->code);
         switch (code) {
@@ -729,19 +723,17 @@ class CodegenVisitor : public HIR::BaseVisitor {
             break;
           }
         }
-      }
-      // inline builtin functions
-      else if (id->ref->resolved_kind ==
-          HIR::resolved_::ResolvedKind::kVVMOpRef) {
+      } else if (id->ref->resolved_kind ==
+                 HIR::resolved_::ResolvedKind::kVVMOpRef) {
+        // inline builtin functions
         HIR::VVMOpRef_t ptr = dynamic_cast<HIR::VVMOpRef_t>(id->ref);
         size_t opcode = ptr->opcode;
         result = reserve_space();
         params.push_back(result);
         emit(opcode, params);
-      }
-      // invoke user-defined functions
-      else if (id->ref->resolved_kind ==
-               HIR::resolved_::ResolvedKind::kFuncRef) {
+      } else if (id->ref->resolved_kind ==
+                 HIR::resolved_::ResolvedKind::kFuncRef) {
+        // invoke user-defined functions
         HIR::FuncRef_t fr = dynamic_cast<HIR::FuncRef_t>(id->ref);
         HIR::FunctionDef_t fd = dynamic_cast<HIR::FunctionDef_t>(fr->ref);
         VVM::operand_t op = func_map_[fd];
@@ -752,10 +744,9 @@ class CodegenVisitor : public HIR::BaseVisitor {
         params.insert(params.begin(), length);
         params.insert(params.begin(), op);
         emit(VVM::opcodes::call, params);
-      }
-      // fill members of type constructors
-      else if (id->ref->resolved_kind ==
-               HIR::resolved_::ResolvedKind::kDataRef) {
+      } else if (id->ref->resolved_kind ==
+                 HIR::resolved_::ResolvedKind::kDataRef) {
+        // fill members of type constructors
         result = reserve_space();
         HIR::Kind_t k = dynamic_cast<HIR::Kind_t>(id->type);
         VVM::operand_t typee = get_type_operand(k->type);
@@ -769,12 +760,10 @@ class CodegenVisitor : public HIR::BaseVisitor {
           VVM::operand_t typee = get_type_operand(node->args[i]->type);
           emit(VVM::opcodes::assign, {value, typee, member});
         }
-      }
-      else {
+      } else {
         nyi("FunctionCall on id not builtin, function, or kind");
       }
-    }
-    else {
+    } else {
       nyi("FunctionCall on non-id expr");
     }
     return result;
@@ -848,8 +837,7 @@ class CodegenVisitor : public HIR::BaseVisitor {
       HIR::declaration_t declaration = ref->ref;
       offset = VVM::encode_operand(declaration->offset,
                                    VVM::OpMask::kImmediate);
-    }
-    else {
+    } else {
       nyi("Member on non-declaration");
     }
 
@@ -869,8 +857,7 @@ class CodegenVisitor : public HIR::BaseVisitor {
       VVM::operand_t result = reserve_space();
       emit(opcode, {value, i, result});
       return result;
-    }
-    else {
+    } else {
       nyi("Subscript on slice");
       return 0;
     }
@@ -952,8 +939,7 @@ class CodegenVisitor : public HIR::BaseVisitor {
     if (is_kind_type(node->type)) {
       // we only reach this node if the user requests it via REPL
       return direct_repr("<type: [" + node->name + "]>");
-    }
-    else {
+    } else {
       VVM::operand_t value = reserve_space();
       VVM::operand_t typee = get_type_operand(node->type);
       emit(VVM::opcodes::alloc, {typee, value});
