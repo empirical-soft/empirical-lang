@@ -22,23 +22,27 @@
 
 #include <docopt/docopt.h>
 
+// global variables from command line; extern these as needed
+bool kDumpAst;
+bool kDumpHir;
+bool kDumpVvm;
+bool kTestingMode;
+
 // evaluate Empirical code
-std::string eval(const std::string& text, bool interactive = true,
-                 bool dump_ast = false, bool dump_hir = false,
-                 bool dump_vvm = false) {
+std::string eval(const std::string& text, bool interactive = true) {
   // compile to bytecode
-  AST::mod_t ast = parse(text, interactive, dump_ast);
-  HIR::mod_t hir = sema(ast, interactive, dump_hir);
-  VVM::Program program = codegen(hir, interactive, dump_vvm);
+  AST::mod_t ast = parse(text, interactive, kDumpAst);
+  HIR::mod_t hir = sema(ast, interactive, kDumpHir);
+  VVM::Program program = codegen(hir, interactive, kDumpVvm);
 
   // interpret bytecode
   return VVM::interpret(program);
 }
 
 // evaluate VVM assembly code
-std::string eval_asm(const std::string& text, bool dump_vvm = false) {
+std::string eval_asm(const std::string& text) {
   // assemble to bytecode
-  VVM::Program program = VVM::assemble(text, dump_vvm);
+  VVM::Program program = VVM::assemble(text, kDumpVvm);
 
   // interpret bytecode
   return VVM::interpret(program);
@@ -70,9 +74,6 @@ std::string read_multiline() {
   return result;
 }
 
-// global variable needed for certain quirks in regression tests
-bool testing_mode;
-
 // main function is the driver for getting user input and calling eval()
 int main(int argc, char* argv[]) {
   // docopt argument parsing
@@ -101,15 +102,15 @@ Options:
                        true,                 // show help if requested
                        EMPIRICAL_VERSION);   // version string
 
-  bool dump_ast = args["--dump-ast"].asBool();
-  bool dump_hir = args["--dump-hir"].asBool();
-  bool dump_vvm = args["--dump-vvm"].asBool();
+  kDumpAst = args["--dump-ast"].asBool();
+  kDumpHir = args["--dump-hir"].asBool();
+  kDumpVvm = args["--dump-vvm"].asBool();
+  kTestingMode = args["--test-mode"].asBool();
 
   std::string md_file = args["--verify-markdown"] ?
                         args["--verify-markdown"].asString() : "";
   std::string filename = args["<file>"] ? args["<file>"].asString() : "";
 
-  testing_mode = args["--test-mode"].asBool();
   int ret_code = 0;
   if (filename.empty() && md_file.empty()) {
     // interactive mode
@@ -137,7 +138,7 @@ Options:
           std::string contents;
           try {
             contents = read_file(line.substr(3));
-            eval(contents, false, dump_ast, dump_hir, dump_vvm);
+            eval(contents, false);
           }
           catch (std::exception& e) {
             std::cerr << e.what() << std::endl;
@@ -147,7 +148,7 @@ Options:
           std::string contents;
           try {
             contents = read_file(line.substr(6));
-            eval(contents, false, dump_ast, dump_hir, dump_vvm);
+            eval(contents, false);
           }
           catch (std::exception& e) {
             std::cerr << e.what() << std::endl;
@@ -174,7 +175,7 @@ Options:
         // eval and print
         try {
           VVM::Timer timer;
-          std::string res = eval(line, true, dump_ast, dump_hir, dump_vvm);
+          std::string res = eval(line);
           std::cout << res << std::endl;
           if (!res.empty()) {
             std::cout << std::endl;
@@ -192,7 +193,7 @@ Options:
     }
   } else if (!md_file.empty()) {
     // verify mode
-    testing_mode = true;
+    kTestingMode = true;
     Tests tests;
     try {
       std::string contents = read_file(md_file);
@@ -226,9 +227,9 @@ Options:
     try {
       std::string contents = read_file(filename);
       if (ends_with(filename, ".vvm")) {
-        eval_asm(contents, dump_vvm);
+        eval_asm(contents);
       } else {
-        eval(contents, false, dump_ast, dump_hir, dump_vvm);
+        eval(contents, false);
       }
     }
     catch (std::exception& e) {

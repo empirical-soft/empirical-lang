@@ -241,6 +241,12 @@ class CodegenVisitor : public HIR::BaseVisitor {
   }
 
   antlrcpp::Any visitFunctionDef(HIR::FunctionDef_t node) override {
+    // check if this has been seen already
+    auto iter = func_map_.find(node);
+    if (iter != func_map_.end()) {
+      return iter->second;
+    }
+    // not seen yet, so proceed
     VVM::FunctionDef* fd = new VVM::FunctionDef;
     fd->name = node->name;
     // attach everything to a global now so body can have recursion
@@ -284,6 +290,12 @@ class CodegenVisitor : public HIR::BaseVisitor {
   }
 
   antlrcpp::Any visitDataDef(HIR::DataDef_t node) override {
+    // check if this has been seen already
+    auto iter = type_map_.find(node->scope);
+    if (iter != type_map_.end()) {
+      return iter->second;
+    }
+    // not seen yet, so proceed
     VVM::type_t typee = reserve_type();
     type_map_[node->scope] = typee;
     std::vector<VVM::named_type_t> types;
@@ -361,18 +373,24 @@ class CodegenVisitor : public HIR::BaseVisitor {
 
   antlrcpp::Any visitDecl(HIR::Decl_t node) override {
     for (auto d: node->decls) {
+      // check if this has been seen already
+      auto iter = reg_map_.find(d);
+      if (iter != reg_map_.end()) {
+        continue;
+      }
+
       // reserve some space
       VVM::operand_t target = reserve_space();
       reg_map_[d] = target;
       VVM::operand_t typee = get_type_operand(d->type);
       emit(VVM::opcodes::alloc, {typee, target});
 
+      // assign the value
+      // TODO should "move" temporaries and "copy" otherwise
       if (d->comptime_literal != nullptr) {
         VVM::operand_t value = visit(d->comptime_literal);
         emit(VVM::opcodes::assign, {value, typee, target});
       } else if (d->value != nullptr) {
-        // assign the value
-        // TODO should "move" temporaries and "copy" otherwise
         VVM::operand_t value = visit(d->value);
         emit(VVM::opcodes::assign, {value, typee, target});
       }
