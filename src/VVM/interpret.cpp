@@ -2356,12 +2356,14 @@ WRAPPER_V_S(count)
   }
 
 #include <VVM/dispatch.h>
-} interpreter;
+} comptime_interpreter, runtime_interpreter;
 
 
 // interpret bytecode and return any saved string
-std::string interpret(const Program& program) {
+std::string interpret(const Program& program, Mode mode) {
   // run interpreter
+  Interpreter& interpreter =
+    (mode == Mode::kComptime) ? comptime_interpreter : runtime_interpreter;
   try {
     interpreter.interpret(program);
   }

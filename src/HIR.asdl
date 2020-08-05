@@ -7,9 +7,12 @@ module HIR
 {
   mod = Module(stmt* body, string? docstring)
 
-  stmt = FunctionDef(identifier name, declaration* args, stmt* body,
+  stmt = FunctionDef(identifier name, declaration* templates,
+                     declaration* args, stmt* body,
                      expr? explicit_rettype, string? docstring,
                      datatype rettype, size_t traits)
+       | TemplateFunctionDef(pointer original, declaration* templates,
+                             stmt* instantiated)
        | GenericFunctionDef(stmt original_func, stmt* instantiated_funcs)
        | DataDef(identifier name, declaration* body, size_t scope)
        | Return(expr? value, expr? comptime_literal)
@@ -50,6 +53,7 @@ module HIR
        | Id(identifier s, resolved ref)
        | ImpliedMember(identifier s, resolved ref, expr implied_value)
        | OverloadedId(identifier s, resolved* refs)
+       | TemplatedId(expr id, expr* templates, resolved ref)
        | List(expr* values)
        | Paren(expr subexpr)
        attributes(datatype? type, size_t traits, compmode mode,
@@ -76,11 +80,13 @@ module HIR
            | UDT(identifier s, resolved ref)
            | Array(datatype type)
            | FuncType(datatype* argtypes, datatype rettype, size_t traits)
+           | TemplateFuncType(datatype* types)
            | Kind(datatype type)
            | Void
 
   resolved = DeclRef(declaration ref)
            | FuncRef(stmt ref)
+           | TemplateFuncRef(stmt ref)
            | GenericFuncRef(stmt ref)
            | DataRef(stmt ref)
            | ModRef(mod ref)

@@ -114,6 +114,12 @@ enum class AsofDirection: int64_t {
   kBackward = 0, kForward = 1, kNearest = 2
 };
 
+// whether an invocation of VVM is for runtime or comptime
+enum class Mode: size_t {
+  kRuntime,
+  kComptime
+};
+
 /*** forward declarations (most defined in bytecode.cpp) ***/
 
 type_definition_t get_type_members(type_t typee, const defined_types_t& types);
@@ -147,7 +153,7 @@ std::string to_string(const Program& program);
 std::string disassemble(const instructions_t& code);
 
 // defined in interpret.cpp
-std::string interpret(const Program& program);
+std::string interpret(const Program& program, Mode mode);
 
 // defined in assemble.cpp
 Program assemble(const std::string& text, bool dump_vvm = false);

@@ -70,8 +70,9 @@ eos : ';' | EOF | {endAhead()}? | {nlAhead()}?;
 
 
 /* function definition */
-funcdef     : FUNC name=func_name '(' args=decl_list? ')'
-              (ARROW rettype=expr)? ':' body=suite END;
+funcdef     : FUNC name=func_name ('{' templates=decl_list '}')?
+              '(' args=decl_list? ')' (ARROW rettype=expr)? ':'
+              body=suite END;
 func_name   : NAME | oper;
 decl_list   : declaration (',' declaration)*;
 declaration : name=NAME (':' type=expr)? ('=' value=expr)?;
@@ -145,7 +146,8 @@ expr : FROM table=expr qt=(SELECT|EXEC) (cols=nexpr_list)?
      | op=NOT operand=expr                                    # UnOpExpr
      | left=expr op=OR right=expr                             # BinOpExpr
      | left=expr op=AND right=expr                            # BinOpExpr
-     | value=atom right=trailer*                              # AtomExpr
+     | value=atom ('{' templates=arg_list? '}')?
+       right=trailer*                                         # AtomExpr
      | '(' expr ')'                                           # ParenExpr
      ;
 
