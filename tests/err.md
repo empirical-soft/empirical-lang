@@ -86,3 +86,12 @@ Error: mismatched types in assignment: Int64 vs Float64
 Error: type 'void' is not assignable
 
 ```
+
+### Functions
+
+```
+>>> x{3}
+Error: type Int64 is not a template
+Error: wrong number of arguments; expected 0 but got 1
+
+```

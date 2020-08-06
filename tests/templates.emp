@@ -1,27 +1,39 @@
 # Examples of templates. Enable --dump-vvm to see how everything is generated
 
+# single value parameter
 func foo{x: Int64}(y: Int64):
   return x + y
 end
 
-# create a new function
 print(foo{7}(8))
 ##15
 
-# reuse the above function
 print(foo{7}(9))
 ##16
 
-# create another function
 print(foo{8}(9))
 ##17
 
+# multiple value parameters
 func baz{x: Int64, y: Int64}(z: Int64):
   var temp = x + y
   return temp + z
 end
 
-# multiple template parameters
 print(baz{1, 2}(3))
 ##6
+
+# type parameter
+func add{T: Type}(x: T, y: T):
+  return x + y
+end
+
+print(add{Int64}(3, 4))
+##7
+
+print(add{Float64}(3.0, 4.0))
+##7.0
+
+print(add{String}("three", "four"))
+##threefour
 
