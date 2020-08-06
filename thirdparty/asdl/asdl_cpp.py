@@ -469,7 +469,6 @@ class ToStringVisitorVisitor(EmitVisitor):
                                  : std::string();
     }
 
-    template <>
     std::string follow(void* value) {
         return std::string();
     }
