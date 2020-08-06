@@ -93,5 +93,6 @@ module HIR
            | VVMOpRef(size_t opcode, datatype type)
            | VVMTypeRef(size_t t)
            | CompilerRef(size_t code, datatype type)
-           | SemaRef(size_t code, datatype type)
+           | SemaFuncRef(size_t code, datatype type)
+           | SemaTypeRef(datatype type)
 }

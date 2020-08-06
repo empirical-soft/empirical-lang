@@ -242,7 +242,6 @@ class CodegenVisitor : public HIR::BaseVisitor {
   }
 
   antlrcpp::Any visitFunctionDef(HIR::FunctionDef_t node) override {
-    // not seen yet, so proceed
     VVM::FunctionDef* fd = new VVM::FunctionDef;
     fd->name = node->name;
     // attach everything to a global now so body can have recursion
@@ -307,7 +306,6 @@ class CodegenVisitor : public HIR::BaseVisitor {
   }
 
   antlrcpp::Any visitDataDef(HIR::DataDef_t node) override {
-    // not seen yet, so proceed
     VVM::type_t typee = reserve_type();
     type_map_[node->scope] = typee;
     std::vector<VVM::named_type_t> types;
@@ -773,6 +771,10 @@ class CodegenVisitor : public HIR::BaseVisitor {
         // invoke user-defined functions
         HIR::FuncRef_t fr = dynamic_cast<HIR::FuncRef_t>(ref);
         HIR::FunctionDef_t fd = dynamic_cast<HIR::FunctionDef_t>(fr->ref);
+        if (func_map_.find(fd) == func_map_.end()) {
+          // make function on demand; this happens with templates in REPL
+          visit(fd);
+        }
         VVM::operand_t op = func_map_[fd];
         result = reserve_space();
         params.push_back(result);
@@ -1119,9 +1121,14 @@ class CodegenVisitor : public HIR::BaseVisitor {
     return 0;
   }
 
-  antlrcpp::Any visitSemaRef(HIR::SemaRef_t node) override {
+  antlrcpp::Any visitSemaFuncRef(HIR::SemaFuncRef_t node) override {
     // we only reach this node if the user requests it via REPL
     return direct_repr("<builtin func>");
+  }
+
+  antlrcpp::Any visitSemaTypeRef(HIR::SemaTypeRef_t node) override {
+    // we only reach this node if the user requests it via REPL
+    return direct_repr("<builtin type>");
   }
 
  public:

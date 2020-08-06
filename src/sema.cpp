@@ -276,8 +276,12 @@ class SemaVisitor : public AST::BaseVisitor {
         HIR::CompilerRef_t ptr = dynamic_cast<HIR::CompilerRef_t>(node);
         return ptr->type;
       }
-      case HIR::resolved_::ResolvedKind::kSemaRef: {
-        HIR::SemaRef_t ptr = dynamic_cast<HIR::SemaRef_t>(node);
+      case HIR::resolved_::ResolvedKind::kSemaFuncRef: {
+        HIR::SemaFuncRef_t ptr = dynamic_cast<HIR::SemaFuncRef_t>(node);
+        return ptr->type;
+      }
+      case HIR::resolved_::ResolvedKind::kSemaTypeRef: {
+        HIR::SemaTypeRef_t ptr = dynamic_cast<HIR::SemaTypeRef_t>(node);
         return ptr->type;
       }
     }
@@ -328,10 +332,13 @@ class SemaVisitor : public AST::BaseVisitor {
         HIR::FuncType_t ft = dynamic_cast<HIR::FuncType_t>(ptr->type);
         return ft->traits;
       }
-      case HIR::resolved_::ResolvedKind::kSemaRef: {
-        HIR::SemaRef_t ptr = dynamic_cast<HIR::SemaRef_t>(node);
+      case HIR::resolved_::ResolvedKind::kSemaFuncRef: {
+        HIR::SemaFuncRef_t ptr = dynamic_cast<HIR::SemaFuncRef_t>(node);
         HIR::FuncType_t ft = dynamic_cast<HIR::FuncType_t>(ptr->type);
         return ft->traits;
+      }
+      case HIR::resolved_::ResolvedKind::kSemaTypeRef: {
+        return all_traits;
       }
     }
   }
@@ -657,9 +664,14 @@ class SemaVisitor : public AST::BaseVisitor {
         HIR::Char_t c = dynamic_cast<HIR::Char_t>(node);
         return "'" + std::string(1, c->c) + "'";
       }
-      default:
-        return "";
+      default: {
+        if (is_kind_type(node->type)) {
+          HIR::Kind_t k = dynamic_cast<HIR::Kind_t>(node->type);
+          return to_string(k->type);
+        }
+      }
     }
+    return "";
   }
 
   // validate that two types have the same underlying structure
@@ -1013,6 +1025,10 @@ class SemaVisitor : public AST::BaseVisitor {
       }
       case HIR::datatype_::DatatypeKind::kKind: {
         HIR::Kind_t k = dynamic_cast<HIR::Kind_t>(node);
+        if (k->type == nullptr) {
+          // this was a generic type
+          return k;
+        }
         return k->type;
       }
       default:
@@ -1267,8 +1283,8 @@ class SemaVisitor : public AST::BaseVisitor {
       HIR::Id_t id = dynamic_cast<HIR::Id_t>(func);
       if (id->ref != nullptr &&
           id->ref->resolved_kind ==
-          HIR::resolved_::ResolvedKind::kSemaRef) {
-        HIR::SemaRef_t ptr = dynamic_cast<HIR::SemaRef_t>(id->ref);
+          HIR::resolved_::ResolvedKind::kSemaFuncRef) {
+        HIR::SemaFuncRef_t ptr = dynamic_cast<HIR::SemaFuncRef_t>(id->ref);
         SemaCodes code = SemaCodes(ptr->code);
         switch (code) {
           case SemaCodes::kTypeOf: {
@@ -1381,20 +1397,22 @@ class SemaVisitor : public AST::BaseVisitor {
 
   // save all builtin items so that id resolution will find them
   void save_builtins() {
-    store_symbol("type_of", HIR::SemaRef(size_t(SemaCodes::kTypeOf),
+    store_symbol("type_of", HIR::SemaFuncRef(size_t(SemaCodes::kTypeOf),
       HIR::FuncType({nullptr}, HIR::Void(), all_traits)));
 
-    store_symbol("traits_of", HIR::SemaRef(size_t(SemaCodes::kTraitsOf),
+    store_symbol("traits_of", HIR::SemaFuncRef(size_t(SemaCodes::kTraitsOf),
       HIR::FuncType({nullptr}, HIR::Void(), all_traits)));
 
-    store_symbol("mode_of", HIR::SemaRef(size_t(SemaCodes::kModeOf),
+    store_symbol("mode_of", HIR::SemaFuncRef(size_t(SemaCodes::kModeOf),
       HIR::FuncType({nullptr}, HIR::Void(), all_traits)));
 
-    store_symbol("columns", HIR::SemaRef(size_t(SemaCodes::kColumns),
+    store_symbol("columns", HIR::SemaFuncRef(size_t(SemaCodes::kColumns),
       HIR::FuncType({nullptr}, HIR::Void(), all_traits)));
 
-    store_symbol("compile", HIR::SemaRef(size_t(SemaCodes::kCompile),
+    store_symbol("compile", HIR::SemaFuncRef(size_t(SemaCodes::kCompile),
       HIR::FuncType({nullptr}, HIR::Void(), all_traits)));
+
+    store_symbol("Type", HIR::SemaTypeRef(HIR::Kind(nullptr)));
 
     store_symbol("store", HIR::CompilerRef(size_t(CompilerCodes::kStore),
       HIR::FuncType({nullptr, HIR::VVMType(size_t(VVM::vvm_types::Ss))},
@@ -1449,7 +1467,13 @@ class SemaVisitor : public AST::BaseVisitor {
     size_t inner_scope = current_scope_;
     std::vector<HIR::declaration_t> templates;
     for (AST::declaration_t t: node->templates) {
-      templates.push_back(visit(t));
+      if (t->value == nullptr) {
+        // type template
+        HIR::expr_t explicit_type = visit(t->explicit_type);
+        store_symbol(t->name, SemaTypeRef(explicit_type->type));
+      } else {
+        templates.push_back(visit(t));
+      }
     }
     send_to_vvm(HIR::Decl(HIR::decltype_t::kLet, templates));
     std::vector<HIR::declaration_t> args;
@@ -2323,18 +2347,20 @@ class SemaVisitor : public AST::BaseVisitor {
       sema_err_ << "Error: type " << to_string(id->type)
                 << " is not a template" << std::endl;
     }
-    // get template parameters and extract as literals
-    // TODO allow types
+    // get template parameters and extract non-types as literals
     std::vector<HIR::expr_t> templates;
     for (AST::expr_t t: node->templates) {
       templates.push_back(visit(t));
     }
     std::vector<HIR::expr_t> literals;
     for (size_t i = 0; i < templates.size(); i++) {
-      HIR::expr_t lit = get_comptime_literal(templates[i]);
-      if (lit == nullptr) {
-        sema_err_ << "Error: template parameter at position " << i
-                  << " must be a comptime literal" << std::endl;
+      HIR::expr_t lit = templates[i];
+      if (!is_kind_type(lit->type)) {
+        lit = get_comptime_literal(templates[i]);
+        if (lit == nullptr) {
+          sema_err_ << "Error: template parameter at position " << i
+                    << " must be a comptime literal" << std::endl;
+        }
       }
       literals.push_back(lit);
     }
@@ -2343,24 +2369,30 @@ class SemaVisitor : public AST::BaseVisitor {
     if (!err_msg.empty()) {
       sema_err_ << "Error: " << err_msg << std::endl;
     }
-    // extract definition
-    HIR::TemplateFuncRef_t ref =
-      dynamic_cast<HIR::TemplateFuncRef_t>(id->ref);
-    HIR::TemplateFunctionDef_t template_def =
-      dynamic_cast<HIR::TemplateFunctionDef_t>(ref->ref);
-    AST::FunctionDef_t func_def =
-      reinterpret_cast<AST::FunctionDef_t>(template_def->original);
-    // instantiate the template if no errors occurred so far
-    Scope::Resolveds resolveds;
     std::string name;
+    Scope::Resolveds resolveds;
+    // instantiate the template if no errors occurred so far
     if (sema_err_.str().size() == starting_err_length) {
+      // extract definition
+      HIR::TemplateFuncRef_t ref =
+        dynamic_cast<HIR::TemplateFuncRef_t>(id->ref);
+      HIR::TemplateFunctionDef_t template_def =
+        dynamic_cast<HIR::TemplateFunctionDef_t>(ref->ref);
+      AST::FunctionDef_t func_def =
+        reinterpret_cast<AST::FunctionDef_t>(template_def->original);
       // search to see if this already exists
       name = id->s + to_string_templates(literals);
       resolveds = find_symbol(name);
       // build it
       if (resolveds.empty()) {
         for (size_t i = 0; i < literals.size(); i++) {
-          func_def->templates[i]->value = downgrade(literals[i]);
+          if (is_kind_type(literals[i]->type)) {
+            // embed the type template
+            func_def->templates[i]->explicit_type = node->templates[i];
+            func_def->templates[i]->value = nullptr;
+          } else {
+            func_def->templates[i]->value = downgrade(literals[i]);
+          }
         }
         func_def->name = name;
         HIR::stmt_t new_def = visit(func_def);
@@ -2451,20 +2483,12 @@ class SemaVisitor : public AST::BaseVisitor {
   }
 
   antlrcpp::Any visitAlias(AST::alias_t node) override {
-    if (!node->name.empty() && isupper(node->name[0])) {
-      sema_err_ << "Error: value name " << node->name
-                << " must begin with lower-case letter" << std::endl;
-    }
     HIR::expr_t value = visit(node->value);
     return HIR::alias(value, node->name);
   }
 
   antlrcpp::Any visitDeclaration(AST::declaration_t node) override {
     size_t starting_err_length = sema_err_.str().size();
-    if (isupper(node->name[0])) {
-      sema_err_ << "Error: value name " << node->name
-                << " must begin with lower-case letter" << std::endl;
-    }
     // get explcit type
     HIR::expr_t explicit_type = nullptr;
     if (node->explicit_type) {

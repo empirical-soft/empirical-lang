@@ -18,4 +18,6 @@ cd ..
 RELEASE=$(git describe --always)
 sed -i~ "s/release: .*/release: $RELEASE/" ../website/download.md
 rm ../website/download.md~
+sed -i~ "s/VERSION=.*/VERSION=$RELEASE/" ../replit/setup_repl.sh
+rm ../replit/setup_repl.sh~
 
