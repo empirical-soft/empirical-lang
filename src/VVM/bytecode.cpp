@@ -268,10 +268,19 @@ size_t encode_opcode(const std::string& op) {
 
 // disassemble a program
 std::string to_string(const Program& program) {
-  std::string result;
-  result += disassemble(program.types) + '\n';
-  result += disassemble(program.constants) + '\n';
-  result += disassemble(program.instructions) + '\n';
+  std::string result, text;
+  text = disassemble(program.types);
+  if (!text.empty()) {
+    result += text + '\n';
+  }
+  text = disassemble(program.constants);
+  if (!text.empty()) {
+    result += text + '\n';
+  }
+  text = disassemble(program.instructions);
+  if (!text.empty()) {
+    result += text + '\n';
+  }
   return result;
 }
 

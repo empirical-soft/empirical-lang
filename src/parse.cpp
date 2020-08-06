@@ -218,6 +218,11 @@ class ParseVisitor : public EmpiricalVisitor {
   antlrcpp::Any visitFuncdef(EmpiricalParser::FuncdefContext *ctx) override {
     AST::identifier name = visit(ctx->name);
 
+    std::vector<AST::declaration_t> templates;
+    if (ctx->templates) {
+      templates = visit(ctx->templates).as<decltype(templates)>();
+    }
+
     std::vector<AST::declaration_t> args;
     if (ctx->args) {
       args = visit(ctx->args).as<decltype(args)>();
@@ -231,7 +236,12 @@ class ParseVisitor : public EmpiricalVisitor {
       explicit_rettype = visit(ctx->rettype);
     }
 
-    return AST::FunctionDef(name, args, body, explicit_rettype, docstring);
+    AST::stmt_t node = AST::FunctionDef(name, templates, args, body,
+                                        explicit_rettype, docstring);
+    if (!templates.empty()) {
+      return AST::TemplateFunctionDef(node, templates);
+    }
+    return node;
   }
 
   antlrcpp::Any visitFunc_name(EmpiricalParser::Func_nameContext *ctx) override {
@@ -568,6 +578,18 @@ class ParseVisitor : public EmpiricalVisitor {
 
   antlrcpp::Any visitAtomExpr(EmpiricalParser::AtomExprContext *ctx) override {
     AST::expr_t e = visit(ctx->value);
+
+    // templates must come with an Id
+    if (ctx->templates) {
+      std::vector<AST::expr_t> templates = visit(ctx->templates);
+      if (e->expr_kind == AST::expr_::ExprKind::kId) {
+        e = TemplatedId(e, templates);
+      }
+      else {
+        parse_err_ << "Error: only an identifier can have a template"
+                   << std::endl;
+      }
+    }
 
     // convert trailer from vector in CST to recursive nodes in AST
     for (auto trailer: ctx->trailer()) {

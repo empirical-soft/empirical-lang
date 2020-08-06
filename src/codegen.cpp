@@ -42,6 +42,7 @@ class CodegenVisitor : public HIR::BaseVisitor {
         return get_vvm_type(arr->type, 'v');
       }
       case HIR::datatype_::DatatypeKind::kFuncType:
+      case HIR::datatype_::DatatypeKind::kTemplateFuncType:
       case HIR::datatype_::DatatypeKind::kKind:
       case HIR::datatype_::DatatypeKind::kVoid: {
         return "?";
@@ -241,11 +242,6 @@ class CodegenVisitor : public HIR::BaseVisitor {
   }
 
   antlrcpp::Any visitFunctionDef(HIR::FunctionDef_t node) override {
-    // check if this has been seen already
-    auto iter = func_map_.find(node);
-    if (iter != func_map_.end()) {
-      return iter->second;
-    }
     // not seen yet, so proceed
     VVM::FunctionDef* fd = new VVM::FunctionDef;
     fd->name = node->name;
@@ -270,6 +266,18 @@ class CodegenVisitor : public HIR::BaseVisitor {
     }
     fd->rettype = !is_void_type(node->rettype) ? get_type_code(node->rettype)
                                                : VVM::encode_type("i64s");
+    // template parameters are next
+    for (auto decl: node->templates) {
+      if (decl->comptime_literal != nullptr) {
+        // template was a value, as opposed to a type
+        VVM::operand_t target = reserve_space();
+        reg_map_[decl] = target;
+        VVM::operand_t typee = get_type_operand(decl->type);
+        emit(VVM::opcodes::alloc, {typee, target});
+        VVM::operand_t value = visit(decl->comptime_literal);
+        emit(VVM::opcodes::assign, {value, typee, target});
+      }
+    }
     // recursively visit body
     for (auto b: node->body) {
       visit(b);
@@ -284,17 +292,21 @@ class CodegenVisitor : public HIR::BaseVisitor {
     return result;
   }
 
-  antlrcpp::Any visitGenericFunctionDef(HIR::GenericFunctionDef_t node) override {
+  antlrcpp::Any visitTemplateFunctionDef(HIR::TemplateFunctionDef_t node)
+    override {
+    for (HIR::stmt_t i: node->instantiated) {
+      visit(i);
+    }
+    return VVM::operand_t(0);
+  }
+
+  antlrcpp::Any visitGenericFunctionDef(HIR::GenericFunctionDef_t node)
+    override {
     nyi("GenericFunctionDef");
     return 0;
   }
 
   antlrcpp::Any visitDataDef(HIR::DataDef_t node) override {
-    // check if this has been seen already
-    auto iter = type_map_.find(node->scope);
-    if (iter != type_map_.end()) {
-      return iter->second;
-    }
     // not seen yet, so proceed
     VVM::type_t typee = reserve_type();
     type_map_[node->scope] = typee;
@@ -373,12 +385,6 @@ class CodegenVisitor : public HIR::BaseVisitor {
 
   antlrcpp::Any visitDecl(HIR::Decl_t node) override {
     for (auto d: node->decls) {
-      // check if this has been seen already
-      auto iter = reg_map_.find(d);
-      if (iter != reg_map_.end()) {
-        continue;
-      }
-
       // reserve some space
       VVM::operand_t target = reserve_space();
       reg_map_[d] = target;
@@ -724,12 +730,25 @@ class CodegenVisitor : public HIR::BaseVisitor {
       VVM::operand_t p = visit(arg);
       params.push_back(p);
     }
+    // get the reference and type
+    HIR::resolved_t ref = nullptr;
+    HIR::datatype_t type = nullptr;
     if (node->func->expr_kind == HIR::expr_::ExprKind::kId) {
       HIR::Id_t id = dynamic_cast<HIR::Id_t>(node->func);
-      if (id->ref->resolved_kind ==
+      ref = id->ref;
+      type = id->type;
+    }
+    if (node->func->expr_kind == HIR::expr_::ExprKind::kTemplatedId) {
+      HIR::TemplatedId_t id = dynamic_cast<HIR::TemplatedId_t>(node->func);
+      ref = id->ref;
+      type = id->type;
+    }
+    // generate based on the kind of reference
+    if (ref != nullptr) {
+      if (ref->resolved_kind ==
           HIR::resolved_::ResolvedKind::kCompilerRef) {
         // handle compiler functions
-        HIR::CompilerRef_t ptr = dynamic_cast<HIR::CompilerRef_t>(id->ref);
+        HIR::CompilerRef_t ptr = dynamic_cast<HIR::CompilerRef_t>(ref);
         CompilerCodes code = CompilerCodes(ptr->code);
         switch (code) {
           case CompilerCodes::kStore: {
@@ -741,18 +760,18 @@ class CodegenVisitor : public HIR::BaseVisitor {
             break;
           }
         }
-      } else if (id->ref->resolved_kind ==
+      } else if (ref->resolved_kind ==
                  HIR::resolved_::ResolvedKind::kVVMOpRef) {
         // inline builtin functions
-        HIR::VVMOpRef_t ptr = dynamic_cast<HIR::VVMOpRef_t>(id->ref);
+        HIR::VVMOpRef_t ptr = dynamic_cast<HIR::VVMOpRef_t>(ref);
         size_t opcode = ptr->opcode;
         result = reserve_space();
         params.push_back(result);
         emit(opcode, params);
-      } else if (id->ref->resolved_kind ==
+      } else if (ref->resolved_kind ==
                  HIR::resolved_::ResolvedKind::kFuncRef) {
         // invoke user-defined functions
-        HIR::FuncRef_t fr = dynamic_cast<HIR::FuncRef_t>(id->ref);
+        HIR::FuncRef_t fr = dynamic_cast<HIR::FuncRef_t>(ref);
         HIR::FunctionDef_t fd = dynamic_cast<HIR::FunctionDef_t>(fr->ref);
         VVM::operand_t op = func_map_[fd];
         result = reserve_space();
@@ -762,11 +781,11 @@ class CodegenVisitor : public HIR::BaseVisitor {
         params.insert(params.begin(), length);
         params.insert(params.begin(), op);
         emit(VVM::opcodes::call, params);
-      } else if (id->ref->resolved_kind ==
+      } else if (ref->resolved_kind ==
                  HIR::resolved_::ResolvedKind::kDataRef) {
         // fill members of type constructors
         result = reserve_space();
-        HIR::Kind_t k = dynamic_cast<HIR::Kind_t>(id->type);
+        HIR::Kind_t k = dynamic_cast<HIR::Kind_t>(type);
         VVM::operand_t typee = get_type_operand(k->type);
         emit(VVM::opcodes::alloc, {typee, result});
         for (size_t i = 0; i < params.size(); i++) {
@@ -779,10 +798,10 @@ class CodegenVisitor : public HIR::BaseVisitor {
           emit(VVM::opcodes::assign, {value, typee, member});
         }
       } else {
-        nyi("FunctionCall on id not builtin, function, or kind");
+        nyi("FunctionCall not on builtin, function, or kind");
       }
     } else {
-      nyi("FunctionCall on non-id expr");
+      nyi("FunctionCall not on id");
     }
     return result;
   }
@@ -953,6 +972,10 @@ class CodegenVisitor : public HIR::BaseVisitor {
     return 0;
   }
 
+  antlrcpp::Any visitTemplatedId(HIR::TemplatedId_t node) override {
+    return visit(node->ref);
+  }
+
   antlrcpp::Any visitList(HIR::List_t node) override {
     if (is_kind_type(node->type)) {
       // we only reach this node if the user requests it via REPL
@@ -1035,6 +1058,11 @@ class CodegenVisitor : public HIR::BaseVisitor {
     return 0;
   }
 
+  antlrcpp::Any visitTemplateFuncType(HIR::TemplateFuncType_t node) override {
+    nyi("TemplateFuncType");
+    return 0;
+  }
+
   antlrcpp::Any visitKind(HIR::Kind_t node) override {
     nyi("Kind");
     return 0;
@@ -1053,6 +1081,11 @@ class CodegenVisitor : public HIR::BaseVisitor {
     // we only reach this node if the user requests it via REPL
     HIR::FunctionDef_t fd = dynamic_cast<HIR::FunctionDef_t>(node->ref);
     return direct_repr("<func: " + fd->name + ">");
+  }
+
+  antlrcpp::Any visitTemplateFuncRef(HIR::TemplateFuncRef_t node) override {
+    // we only reach this node if the user requests it via REPL
+    return direct_repr("<template>");
   }
 
   antlrcpp::Any visitGenericFuncRef(HIR::GenericFuncRef_t node) override {
@@ -1105,12 +1138,15 @@ class CodegenVisitor : public HIR::BaseVisitor {
   void set_interactive(bool b) {
     interactive_ = b;
   }
-} codegen_visitor;
+} comptime_codegen, runtime_codegen;
 
 
 // generate bytecode for VVM
-VVM::Program codegen(HIR::mod_t hir, bool interactive, bool dump_vvm) {
+VVM::Program codegen(HIR::mod_t hir, VVM::Mode mode, bool interactive,
+                     bool dump_vvm) {
   // build VVM bytecode
+  CodegenVisitor& codegen_visitor =
+    (mode == VVM::Mode::kComptime) ? comptime_codegen : runtime_codegen;
   codegen_visitor.set_interactive(interactive);
   codegen_visitor.visit(hir);
   VVM::Program program = codegen_visitor.get_program();

@@ -127,6 +127,7 @@ class NamespaceVisitor(EmitVisitor):
         self.emit("namespace %s {" % mod.name, 0)
         self.emit("", 0)
         self.emit('typedef std::string identifier;', 0)
+        self.emit('typedef void* pointer;', 0)
 
 
 class TypeDefVisitor(EmitVisitor):
@@ -466,6 +467,10 @@ class ToStringVisitorVisitor(EmitVisitor):
         bool placed = already_visited_.insert(value).second;
         return (placed && value) ? visit(value).template as<std::string>()
                                  : std::string();
+    }
+
+    std::string follow(void* value) {
+        return std::string();
     }
 
     template <class T>

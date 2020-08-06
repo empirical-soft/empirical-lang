@@ -21,8 +21,6 @@
 #include <VVM/opcodes.h>
 #include <VVM/utils/csv_infer.hpp>
 
-extern bool kDumpVvm;
-
 // build high-level IR (HIR) from abstract syntax tree (AST)
 class SemaVisitor : public AST::BaseVisitor {
   // store all prior IR
@@ -175,8 +173,9 @@ class SemaVisitor : public AST::BaseVisitor {
         case VVM::vvm_types::c8s: {
           // round-trip through VVM
           HIR::mod_t wrapper = HIR::Module({HIR::Expr(node)}, "");
-          VVM:: Program program = codegen(wrapper, true, false);
-          std::string result = VVM::interpret(program);
+          VVM:: Program program = codegen(wrapper, VVM::Mode::kComptime,
+                                          true, false);
+          std::string result = VVM::interpret(program, VVM::Mode::kComptime);
           AST::mod_t ast = parse(result, true, false);
           HIR::mod_t hir = sema(ast, true, false);
           HIR::Module_t mod = dynamic_cast<HIR::Module_t>(hir);
@@ -193,9 +192,36 @@ class SemaVisitor : public AST::BaseVisitor {
   // send a statement to VVM now so that comptime expressions can have it
   void send_to_vvm(HIR::stmt_t node) {
     HIR::mod_t wrapper = HIR::Module({node}, "");
-    VVM::Program program = codegen(wrapper, true, kDumpVvm);
-    (void) VVM::interpret(program);
+    VVM::Program program = codegen(wrapper, VVM::Mode::kComptime, true, false);
+    (void) VVM::interpret(program, VVM::Mode::kComptime);
     return;
+  }
+
+  // "downgrade" a HIR literal to an AST literal; for templates
+  AST::expr_t downgrade(HIR::expr_t node) {
+    if (node == nullptr) {
+      return nullptr;
+    }
+    switch (node->expr_kind) {
+      case HIR::expr_::ExprKind::kIntegerLiteral: {
+        HIR::IntegerLiteral_t n = dynamic_cast<HIR::IntegerLiteral_t>(node);
+        return AST::IntegerLiteral(n->n);
+      }
+      case HIR::expr_::ExprKind::kBoolLiteral: {
+        HIR::BoolLiteral_t b = dynamic_cast<HIR::BoolLiteral_t>(node);
+        return AST::BoolLiteral(b->b);
+      }
+      case HIR::expr_::ExprKind::kStr: {
+        HIR::Str_t s = dynamic_cast<HIR::Str_t>(node);
+        return AST::Str(s->s);
+      }
+      case HIR::expr_::ExprKind::kChar: {
+        HIR::Char_t c = dynamic_cast<HIR::Char_t>(node);
+        return AST::Char(c->c);
+      }
+      default:
+        return nullptr;
+    }
   }
 
   /* get info from a node */
@@ -213,6 +239,13 @@ class SemaVisitor : public AST::BaseVisitor {
       case HIR::resolved_::ResolvedKind::kFuncRef: {
         HIR::FuncRef_t ptr = dynamic_cast<HIR::FuncRef_t>(node);
         HIR::FunctionDef_t def = dynamic_cast<HIR::FunctionDef_t>(ptr->ref);
+        return get_type(def);
+      }
+      case HIR::resolved_::ResolvedKind::kTemplateFuncRef: {
+        HIR::TemplateFuncRef_t ptr =
+          dynamic_cast<HIR::TemplateFuncRef_t>(node);
+        HIR::TemplateFunctionDef_t def =
+          dynamic_cast<HIR::TemplateFunctionDef_t>(ptr->ref);
         return get_type(def);
       }
       case HIR::resolved_::ResolvedKind::kGenericFuncRef: {
@@ -264,6 +297,9 @@ class SemaVisitor : public AST::BaseVisitor {
         HIR::FuncRef_t ptr = dynamic_cast<HIR::FuncRef_t>(node);
         HIR::FunctionDef_t def = dynamic_cast<HIR::FunctionDef_t>(ptr->ref);
         return def->traits;
+      }
+      case HIR::resolved_::ResolvedKind::kTemplateFuncRef: {
+        return all_traits;
       }
       case HIR::resolved_::ResolvedKind::kGenericFuncRef: {
         HIR::GenericFuncRef_t ptr = dynamic_cast<HIR::GenericFuncRef_t>(node);
@@ -324,6 +360,15 @@ class SemaVisitor : public AST::BaseVisitor {
     HIR::datatype_t rettype = node->rettype;
     Traits traits = node->traits;
     return FuncType(argtypes, rettype, traits);
+  }
+
+  // return type from a template function definition
+  HIR::datatype_t get_type(HIR::TemplateFunctionDef_t node) {
+    std::vector<HIR::datatype_t> types;
+    for (HIR::declaration_t t: node->templates) {
+      types.push_back(t->type);
+    }
+    return TemplateFuncType(types);
   }
 
   // return resolved item's scope, or zero if not available
@@ -536,6 +581,19 @@ class SemaVisitor : public AST::BaseVisitor {
         result += ") -> " + to_string(ft->rettype);
         return result;
       }
+      case HIR::datatype_::DatatypeKind::kTemplateFuncType: {
+        HIR::TemplateFuncType_t ft =
+          dynamic_cast<HIR::TemplateFuncType_t>(node);
+        std::string result = "{";
+        if (ft->types.size() >= 1) {
+          result += to_string(ft->types[0]);
+          for (size_t i = 1; i < ft->types.size(); i++) {
+            result += ", " + to_string(ft->types[i]);
+          }
+        }
+        result += "}";
+        return result;
+      }
       case HIR::datatype_::DatatypeKind::kKind: {
         HIR::Kind_t k = dynamic_cast<HIR::Kind_t>(node);
         return "Kind(" + to_string(k->type) + ")";
@@ -562,6 +620,46 @@ class SemaVisitor : public AST::BaseVisitor {
       result += ")";
     }
     return result;
+  }
+
+  // string-ify template parameters; useful for name mangling
+  std::string to_string_templates(const std::vector<HIR::expr_t>& templates) {
+    std::string result = "{";
+    if (templates.size() >= 1) {
+      result += to_string_literal(templates[0]);
+      for (size_t i = 1; i < templates.size(); i++) {
+        result += ", " + to_string_literal(templates[i]);
+      }
+    }
+    result += "}";
+    return result;
+  }
+
+  // return string of a literal value
+  std::string to_string_literal(HIR::expr_t node) {
+    if (node == nullptr) {
+      return "";
+    }
+    switch (node->expr_kind) {
+      case HIR::expr_::ExprKind::kIntegerLiteral: {
+        HIR::IntegerLiteral_t n = dynamic_cast<HIR::IntegerLiteral_t>(node);
+        return std::to_string(n->n);
+      }
+      case HIR::expr_::ExprKind::kBoolLiteral: {
+        HIR::BoolLiteral_t b = dynamic_cast<HIR::BoolLiteral_t>(node);
+        return b->b ? "true" : "false";
+      }
+      case HIR::expr_::ExprKind::kStr: {
+        HIR::Str_t s = dynamic_cast<HIR::Str_t>(node);
+        return '"' + s->s + '"';
+      }
+      case HIR::expr_::ExprKind::kChar: {
+        HIR::Char_t c = dynamic_cast<HIR::Char_t>(node);
+        return "'" + std::string(1, c->c) + "'";
+      }
+      default:
+        return "";
+    }
   }
 
   // validate that two types have the same underlying structure
@@ -614,6 +712,21 @@ class SemaVisitor : public AST::BaseVisitor {
         }
         if (!is_same_type(left_ft->rettype, right_ft->rettype)) {
           return false;
+        }
+        break;
+      }
+      case HIR::datatype_::DatatypeKind::kTemplateFuncType: {
+        HIR::TemplateFuncType_t left_ft =
+          dynamic_cast<HIR::TemplateFuncType_t>(left);
+        HIR::TemplateFuncType_t right_ft =
+        dynamic_cast<HIR::TemplateFuncType_t>(right);
+        if (left_ft->types.size() != right_ft->types.size()) {
+          return false;
+        }
+        for (size_t i = 0; i < left_ft->types.size(); i++) {
+          if (!is_same_type(left_ft->types[i], right_ft->types[i])) {
+            return false;
+          }
         }
         break;
       }
@@ -747,7 +860,7 @@ class SemaVisitor : public AST::BaseVisitor {
   // can overload types and functions with new functions
   bool is_overloadable(HIR::resolved_t first, HIR::resolved_t second) {
     switch (first->resolved_kind) {
-      // overlaod types with functions
+      // overload types with functions
       case HIR::resolved_::ResolvedKind::kVVMTypeRef:
       case HIR::resolved_::ResolvedKind::kDataRef: {
         switch (second->resolved_kind) {
@@ -796,6 +909,19 @@ class SemaVisitor : public AST::BaseVisitor {
     switch (node->datatype_kind) {
       case HIR::datatype_::DatatypeKind::kFuncType:
       case HIR::datatype_::DatatypeKind::kKind:
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  // is this a template
+  bool is_template(HIR::datatype_t node) {
+    if (node == nullptr) {
+      return true;
+    }
+    switch (node->datatype_kind) {
+      case HIR::datatype_::DatatypeKind::kTemplateFuncType:
         return true;
       default:
         return false;
@@ -933,6 +1059,11 @@ class SemaVisitor : public AST::BaseVisitor {
         HIR::FuncType_t ft = dynamic_cast<HIR::FuncType_t>(node);
         return ft->argtypes;
       }
+      case HIR::datatype_::DatatypeKind::kTemplateFuncType: {
+        HIR::TemplateFuncType_t ft =
+          dynamic_cast<HIR::TemplateFuncType_t>(node);
+        return ft->types;
+      }
       case HIR::datatype_::DatatypeKind::kKind: {
         HIR::Kind_t k = dynamic_cast<HIR::Kind_t>(node);
         std::vector<HIR::datatype_t> argtypes;
@@ -989,6 +1120,41 @@ class SemaVisitor : public AST::BaseVisitor {
       }
     }
     return oss.str();
+  }
+
+  // replace overloaded ID with specific ID that matches arguments
+  std::string choose_overloaded(HIR::expr_t& func,
+                                const std::vector<HIR::expr_t>& args) {
+    HIR::OverloadedId_t id = dynamic_cast<HIR::OverloadedId_t>(func);
+    std::string err_msg;
+    size_t counted_mismatch = 0;
+    const size_t max_counted = 3;
+    for (HIR::resolved_t ref: id->refs) {
+      HIR::datatype_t func_type = get_type(ref);
+      std::string result = match_args(args, func_type);
+      if (result.empty()) {
+        // replace overload with specific
+        func = HIR::Id(id->s, ref, func_type, get_traits(ref),
+                       HIR::compmode_t::kNormal, id->s);
+        err_msg.clear();
+        break;
+      } else {
+        counted_mismatch++;
+        if (counted_mismatch <= max_counted) {
+          err_msg += "\n  candidate: " + to_string(func_type) + "\n    "
+                  + result;
+        }
+      }
+    }
+    if (!err_msg.empty()) {
+      if (counted_mismatch > max_counted) {
+        err_msg += "\n  ...\n  <"
+                + std::to_string(counted_mismatch - max_counted)
+                + " others>";
+      }
+      err_msg = "unable to match overloaded function " + id->s + err_msg;
+    }
+    return err_msg;
   }
 
   // create an anonymous function name
@@ -1277,10 +1443,15 @@ class SemaVisitor : public AST::BaseVisitor {
                   << " has invalid type" << std::endl;
       }
     }
-    // evaluate arguments in a new scope
+    // evaluate arguments and template parameters in a new scope
     size_t outer_scope = current_scope_;
     push_scope();
     size_t inner_scope = current_scope_;
+    std::vector<HIR::declaration_t> templates;
+    for (AST::declaration_t t: node->templates) {
+      templates.push_back(visit(t));
+    }
+    send_to_vvm(HIR::Decl(HIR::decltype_t::kLet, templates));
     std::vector<HIR::declaration_t> args;
     for (AST::declaration_t a: node->args) {
       HIR::declaration_t d = visit(a);
@@ -1291,7 +1462,7 @@ class SemaVisitor : public AST::BaseVisitor {
     // create shell now so body can have recursion
     std::vector<HIR::stmt_t> body;
     HIR::stmt_t new_node =
-      HIR::FunctionDef(node->name, args, body, explicit_rettype,
+      HIR::FunctionDef(node->name, templates, args, body, explicit_rettype,
                        node->docstring, rettype, empty_traits);
     HIR::FunctionDef_t fd = dynamic_cast<HIR::FunctionDef_t>(new_node);
     // missing argument types implies generic function
@@ -1373,10 +1544,37 @@ class SemaVisitor : public AST::BaseVisitor {
     if (sema_err_.str().size() == starting_err_length) {
       send_to_vvm(new_node);
     } else {
-      // remove from scope if an error had occured
+      // remove from scope if an error had occurred
       remove_symbol_ref(node->name, ref);
     }
     return generic ? generic : new_node;
+  }
+
+  antlrcpp::Any visitTemplateFunctionDef(AST::TemplateFunctionDef_t node)
+    override {
+    // evaluate template parameters in a new scope
+    push_scope();
+    std::vector<HIR::declaration_t> templates;
+    for (AST::declaration_t t: node->templates) {
+      HIR::declaration_t d = visit(t);
+      d->traits = all_traits;
+      d->mode = HIR::compmode_t::kComptime;
+      templates.push_back(d);
+    }
+    pop_scope();
+
+    // construct node and store it
+    std::vector<HIR::stmt_t> instantiated;
+    std::string name = dynamic_cast<AST::FunctionDef_t>(node->original)->name;
+    HIR::stmt_t new_node =
+      HIR::TemplateFunctionDef(node->original, templates, instantiated);
+    HIR::resolved_t ref = HIR::TemplateFuncRef(new_node);
+    if (!store_symbol(name, ref)) {
+      sema_err_ << "Error: symbol " << name
+                << " was already defined" << std::endl;
+    }
+
+    return new_node;
   }
 
   antlrcpp::Any visitDataDef(AST::DataDef_t node) override {
@@ -1411,7 +1609,7 @@ class SemaVisitor : public AST::BaseVisitor {
     if (sema_err_.str().size() == starting_err_length) {
       send_to_vvm(new_node);
     } else {
-      // remove from scope if an error had occured
+      // remove from scope if an error had occurred
       remove_symbol_ref(node->name, ref);
     }
     return new_node;
@@ -1906,8 +2104,9 @@ class SemaVisitor : public AST::BaseVisitor {
           // TODO recursively copy def's body (needs HIR visitor)
           std::vector<HIR::stmt_t> new_body;
           // generate function
+          std::vector<HIR::declaration_t> templates;
           HIR::stmt_t new_def =
-            HIR::FunctionDef(def->name, new_args, new_body, nullptr,
+            HIR::FunctionDef(def->name, templates, new_args, new_body, nullptr,
                              def->docstring, def->rettype, empty_traits);
           generic->instantiated_funcs.push_back(new_def);
           HIR::resolved_t ref = FuncRef(new_def);
@@ -1921,37 +2120,9 @@ class SemaVisitor : public AST::BaseVisitor {
       }
     } else if (is_overloaded(func)) {
       // check for overloaded functions
-      // TODO we will eventually want specialization of generic functions
-      // TODO handle higher-order overloaded functions
-      HIR::OverloadedId_t id = dynamic_cast<HIR::OverloadedId_t>(func);
-      std::string err_msg;
-      size_t counted_mismatch = 0;
-      const size_t max_counted = 3;
-      for (HIR::resolved_t ref: id->refs) {
-        HIR::datatype_t func_type = get_type(ref);
-        std::string result = match_args(args, func_type);
-        if (result.empty()) {
-          // replace overload with specific function
-          func = HIR::Id(id->s, ref, func_type, get_traits(ref),
-                         HIR::compmode_t::kNormal, id->s);
-          err_msg.clear();
-          break;
-        } else {
-          counted_mismatch++;
-          if (counted_mismatch <= max_counted) {
-            err_msg += "\n  candidate: " + to_string(func_type) + "\n    "
-                    + result;
-          }
-        }
-      }
+      std::string err_msg = choose_overloaded(func, args);
       if (!err_msg.empty()) {
-        if (counted_mismatch > max_counted) {
-          err_msg += "\n  ...\n  <"
-                  + std::to_string(counted_mismatch - max_counted)
-                  + " others>";
-        }
-        sema_err_ << "Error: unable to match overloaded function " << id->s
-                  << err_msg << std::endl;
+        sema_err_ << "Error: " << err_msg << std::endl;
       }
     } else {
       // regular (non-overloaded, non-generic) function
@@ -2002,8 +2173,8 @@ class SemaVisitor : public AST::BaseVisitor {
       // (ie., need '$let' to force compiler to pre-set variables)
       if (is_string_type(e->type)) {
         HIR::mod_t mod = HIR::Module({HIR::Expr(e)}, "");
-        VVM::Program program = codegen(mod, true, false);
-        std::string filename = VVM::interpret(program);
+        VVM::Program program = codegen(mod, VVM::Mode::kComptime, true, false);
+        std::string filename = VVM::interpret(program, VVM::Mode::kComptime);
         filename = filename.substr(1, filename.size() - 2);  // chop quotes
         std::string typestr = VVM::infer_table_from_file(filename);
         type_name = "Provider$" + filename;
@@ -2138,6 +2309,72 @@ class SemaVisitor : public AST::BaseVisitor {
       return HIR::Id(node->s, ptr, type, traits, mode, node->s);
     }
     return HIR::OverloadedId(node->s, resolveds, type, traits, mode, node->s);
+  }
+
+  antlrcpp::Any visitTemplatedId(AST::TemplatedId_t node) override {
+    size_t starting_err_length = sema_err_.str().size();
+    HIR::expr_t id_expr = visit(node->id);
+    if (id_expr->expr_kind != HIR::expr_::ExprKind::kId) {
+      // templates are not overloadable, plus parser mandates an Id
+      nyi("TemplatedId on non-Id");
+    }
+    HIR::Id_t id = dynamic_cast<HIR::Id_t>(id_expr);
+    if (!is_template(id->type)) {
+      sema_err_ << "Error: type " << to_string(id->type)
+                << " is not a template" << std::endl;
+    }
+    // get template parameters and extract as literals
+    // TODO allow types
+    std::vector<HIR::expr_t> templates;
+    for (AST::expr_t t: node->templates) {
+      templates.push_back(visit(t));
+    }
+    std::vector<HIR::expr_t> literals;
+    for (size_t i = 0; i < templates.size(); i++) {
+      HIR::expr_t lit = get_comptime_literal(templates[i]);
+      if (lit == nullptr) {
+        sema_err_ << "Error: template parameter at position " << i
+                  << " must be a comptime literal" << std::endl;
+      }
+      literals.push_back(lit);
+    }
+    // verify parameters
+    std::string err_msg = match_args(templates, id->type);
+    if (!err_msg.empty()) {
+      sema_err_ << "Error: " << err_msg << std::endl;
+    }
+    // extract definition
+    HIR::TemplateFuncRef_t ref =
+      dynamic_cast<HIR::TemplateFuncRef_t>(id->ref);
+    HIR::TemplateFunctionDef_t template_def =
+      dynamic_cast<HIR::TemplateFunctionDef_t>(ref->ref);
+    AST::FunctionDef_t func_def =
+      reinterpret_cast<AST::FunctionDef_t>(template_def->original);
+    // instantiate the template if no errors occurred so far
+    Scope::Resolveds resolveds;
+    std::string name;
+    if (sema_err_.str().size() == starting_err_length) {
+      // search to see if this already exists
+      name = id->s + to_string_templates(literals);
+      resolveds = find_symbol(name);
+      // build it
+      if (resolveds.empty()) {
+        for (size_t i = 0; i < literals.size(); i++) {
+          func_def->templates[i]->value = downgrade(literals[i]);
+        }
+        func_def->name = name;
+        HIR::stmt_t new_def = visit(func_def);
+        template_def->instantiated.push_back(new_def);
+        resolveds = find_symbol(name);
+      }
+    }
+    // get info
+    HIR::resolved_t ptr = resolveds.empty() ? nullptr : resolveds[0];
+    HIR::datatype_t type = get_type(ptr);
+    Traits traits = get_traits(ptr);
+    HIR::compmode_t mode = get_mode(ptr);
+    // put it all together
+    return HIR::TemplatedId(id, templates, ptr, type, traits, mode, name);
   }
 
   antlrcpp::Any visitList(AST::List_t node) override {

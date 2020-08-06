@@ -33,10 +33,11 @@ std::string eval(const std::string& text, bool interactive = true) {
   // compile to bytecode
   AST::mod_t ast = parse(text, interactive, kDumpAst);
   HIR::mod_t hir = sema(ast, interactive, kDumpHir);
-  VVM::Program program = codegen(hir, interactive, kDumpVvm);
+  VVM::Program program = codegen(hir, VVM::Mode::kRuntime,
+                                 interactive, kDumpVvm);
 
   // interpret bytecode
-  return VVM::interpret(program);
+  return VVM::interpret(program, VVM::Mode::kRuntime);
 }
 
 // evaluate VVM assembly code
@@ -45,7 +46,7 @@ std::string eval_asm(const std::string& text) {
   VVM::Program program = VVM::assemble(text, kDumpVvm);
 
   // interpret bytecode
-  return VVM::interpret(program);
+  return VVM::interpret(program, VVM::Mode::kRuntime);
 }
 
 // read an entire file's contents

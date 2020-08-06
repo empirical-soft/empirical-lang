@@ -23,3 +23,12 @@ let z = compile("x + y")
 print(z)
 ##9
 
+func foo(x: Int64):
+  let temp1 = 1
+  let temp2 = temp1 + 3
+  return x + temp2
+end
+
+print(foo(7))
+##11
+

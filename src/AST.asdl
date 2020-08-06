@@ -7,8 +7,10 @@ module AST
 {
   mod = Module(stmt* body, string? docstring)
 
-  stmt = FunctionDef(identifier name, declaration* args, stmt* body,
+  stmt = FunctionDef(identifier name, declaration* templates,
+                     declaration* args, stmt* body,
                      expr? explicit_rettype, string? docstring)
+       | TemplateFunctionDef(stmt original, declaration* templates)
        | DataDef(identifier name, declaration* body)
        | Return(expr? value)
        | If(expr test, stmt* body, stmt* orelse)
@@ -37,6 +39,7 @@ module AST
        | Str(string s)
        | Char(char c)
        | Id(identifier s)
+       | TemplatedId(expr id, expr* templates)
        | List(expr* values)
        | Paren(expr subexpr)
 

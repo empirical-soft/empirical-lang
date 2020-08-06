@@ -27,5 +27,6 @@ enum class CompilerCodes: size_t {
 // functions to compile Empirical into VVM bytecode
 AST::mod_t parse(const std::string& text, bool interactive, bool dump_ast);
 HIR::mod_t sema(AST::mod_t ast, bool interactive, bool dump_hir);
-VVM::Program codegen(HIR::mod_t hir, bool interactive, bool dump_vvm);
+VVM::Program codegen(HIR::mod_t hir, VVM::Mode vvm_mode, bool interactive,
+                     bool dump_vvm);
 
