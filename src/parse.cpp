@@ -239,7 +239,7 @@ class ParseVisitor : public EmpiricalVisitor {
     AST::stmt_t node = AST::FunctionDef(name, templates, args, body,
                                         explicit_rettype, docstring);
     if (!templates.empty()) {
-      return AST::TemplateFunctionDef(node, templates);
+      return AST::TemplateDef(node, templates);
     }
     return node;
   }
@@ -276,8 +276,19 @@ class ParseVisitor : public EmpiricalVisitor {
 
   antlrcpp::Any visitDatadef(EmpiricalParser::DatadefContext *ctx) override {
     AST::identifier name(ctx->name->getText());
+
+    std::vector<AST::declaration_t> templates;
+    if (ctx->templates) {
+      templates = visit(ctx->templates).as<decltype(templates)>();
+    }
+
     std::vector<AST::declaration_t> body = visit(ctx->body);
-    return AST::DataDef(name, body);
+
+    AST::stmt_t node = AST::DataDef(name, templates, body);
+    if (!templates.empty()) {
+      return AST::TemplateDef(node, templates);
+    }
+    return node;
   }
 
   /* control flow */

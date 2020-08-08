@@ -79,7 +79,8 @@ declaration : name=NAME (':' type=expr)? ('=' value=expr)?;
 
 
 /* data definition */
-datadef : DATA name=NAME ':' body=decl_list END;
+datadef : DATA name=NAME ('{' templates=decl_list '}')? ':'
+          body=decl_list END;
 
 
 /* control flow */
