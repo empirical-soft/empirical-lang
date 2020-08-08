@@ -233,18 +233,15 @@ class SemaVisitor : public AST::BaseVisitor {
         HIR::FunctionDef_t def = dynamic_cast<HIR::FunctionDef_t>(ptr->ref);
         return get_type(def);
       }
+      case HIR::resolved_::ResolvedKind::kGenericRef: {
+        HIR::GenericRef_t ptr = dynamic_cast<HIR::GenericRef_t>(node);
+        HIR::GenericDef_t def = dynamic_cast<HIR::GenericDef_t>(ptr->ref);
+        return get_type(def);
+      }
       case HIR::resolved_::ResolvedKind::kTemplateRef: {
         HIR::TemplateRef_t ptr = dynamic_cast<HIR::TemplateRef_t>(node);
         HIR::TemplateDef_t def = dynamic_cast<HIR::TemplateDef_t>(ptr->ref);
         return get_type(def);
-      }
-      case HIR::resolved_::ResolvedKind::kGenericFuncRef: {
-        HIR::GenericFuncRef_t ptr = dynamic_cast<HIR::GenericFuncRef_t>(node);
-        HIR::GenericFunctionDef_t def =
-          dynamic_cast<HIR::GenericFunctionDef_t>(ptr->ref);
-        HIR::FunctionDef_t original =
-          dynamic_cast<HIR::FunctionDef_t>(def->original_func);
-        return get_type(original);
       }
       case HIR::resolved_::ResolvedKind::kDataRef: {
         HIR::DataRef_t dr = dynamic_cast<HIR::DataRef_t>(node);
@@ -292,16 +289,13 @@ class SemaVisitor : public AST::BaseVisitor {
         HIR::FunctionDef_t def = dynamic_cast<HIR::FunctionDef_t>(ptr->ref);
         return def->traits;
       }
+      case HIR::resolved_::ResolvedKind::kGenericRef: {
+        HIR::GenericRef_t ptr = dynamic_cast<HIR::GenericRef_t>(node);
+        HIR::GenericDef_t def = dynamic_cast<HIR::GenericDef_t>(ptr->ref);
+        return def->traits;
+      }
       case HIR::resolved_::ResolvedKind::kTemplateRef: {
         return all_traits;
-      }
-      case HIR::resolved_::ResolvedKind::kGenericFuncRef: {
-        HIR::GenericFuncRef_t ptr = dynamic_cast<HIR::GenericFuncRef_t>(node);
-        HIR::GenericFunctionDef_t def =
-          dynamic_cast<HIR::GenericFunctionDef_t>(ptr->ref);
-        HIR::FunctionDef_t original =
-          dynamic_cast<HIR::FunctionDef_t>(def->original_func);
-        return original->traits;
       }
       case HIR::resolved_::ResolvedKind::kDataRef: {
         return all_traits;
@@ -350,6 +344,17 @@ class SemaVisitor : public AST::BaseVisitor {
 
   // return type from a function definition
   HIR::datatype_t get_type(HIR::FunctionDef_t node) {
+    std::vector<HIR::datatype_t> argtypes;
+    for (HIR::declaration_t arg: node->args) {
+      argtypes.push_back(arg->type);
+    }
+    HIR::datatype_t rettype = node->rettype;
+    Traits traits = node->traits;
+    return FuncType(argtypes, rettype, traits);
+  }
+
+  // return type from a generic function definition
+  HIR::datatype_t get_type(HIR::GenericDef_t node) {
     std::vector<HIR::datatype_t> argtypes;
     for (HIR::declaration_t arg: node->args) {
       argtypes.push_back(arg->type);
@@ -618,6 +623,19 @@ class SemaVisitor : public AST::BaseVisitor {
     return result;
   }
 
+  // string-ify generic arguments; useful for name mangling
+  std::string to_string_generics(const std::vector<HIR::expr_t>& args) {
+    std::string result = "(";
+    if (args.size() >= 1) {
+      result += to_string(args[0]->type);
+      for (size_t i = 1; i < args.size(); i++) {
+        result += ", " + to_string(args[i]->type);
+      }
+    }
+    result += ")";
+    return result;
+  }
+
   // string-ify template parameters; useful for name mangling
   std::string to_string_templates(const std::vector<HIR::expr_t>& templates) {
     std::string result = "{";
@@ -857,7 +875,7 @@ class SemaVisitor : public AST::BaseVisitor {
             node->datatype_kind == HIR::datatype_::DatatypeKind::kArray);
   }
 
-  // can overload types and functions with new functions
+  // can overload types and functions with new functions (prohibit sema)
   bool is_overloadable(HIR::resolved_t first, HIR::resolved_t second) {
     switch (first->resolved_kind) {
       // overload types with functions
@@ -873,10 +891,12 @@ class SemaVisitor : public AST::BaseVisitor {
       }
       // overload functions with unique signatures
       case HIR::resolved_::ResolvedKind::kVVMOpRef:
-      case HIR::resolved_::ResolvedKind::kFuncRef: {
+      case HIR::resolved_::ResolvedKind::kFuncRef:
+      case HIR::resolved_::ResolvedKind::kGenericRef: {
         switch (second->resolved_kind) {
           case HIR::resolved_::ResolvedKind::kVVMOpRef:
           case HIR::resolved_::ResolvedKind::kFuncRef:
+          case HIR::resolved_::ResolvedKind::kGenericRef:
             return !is_same_type(get_type(first), get_type(second));
           default:
             return false;
@@ -893,8 +913,10 @@ class SemaVisitor : public AST::BaseVisitor {
       return true;
     }
     switch (ref->resolved_kind) {
-      case HIR::resolved_::ResolvedKind::kVVMTypeRef:
       case HIR::resolved_::ResolvedKind::kVVMOpRef:
+      case HIR::resolved_::ResolvedKind::kVVMTypeRef:
+      case HIR::resolved_::ResolvedKind::kSemaFuncRef:
+      case HIR::resolved_::ResolvedKind::kSemaTypeRef:
         return false;
       default:
         return true;
@@ -915,6 +937,11 @@ class SemaVisitor : public AST::BaseVisitor {
     }
   }
 
+  bool is_generic(HIR::resolved_t node) {
+    return (node != nullptr &&
+            node->resolved_kind == HIR::resolved_::ResolvedKind::kGenericRef);
+  }
+
   bool is_template(HIR::resolved_t node) {
     return (node != nullptr &&
             node->resolved_kind == HIR::resolved_::ResolvedKind::kTemplateRef);
@@ -923,6 +950,11 @@ class SemaVisitor : public AST::BaseVisitor {
   bool is_overloaded(HIR::expr_t node) {
     return (node != nullptr &&
             node->expr_kind == HIR::expr_::ExprKind::kOverloadedId);
+  }
+
+  bool is_id(HIR::expr_t node) {
+    return (node != nullptr &&
+            node->expr_kind == HIR::expr_::ExprKind::kId);
   }
 
   bool is_expr(HIR::stmt_t node) {
@@ -1013,35 +1045,6 @@ class SemaVisitor : public AST::BaseVisitor {
       }
       default:
         return nullptr;
-    }
-  }
-
-  // return generic function from reference
-  HIR::GenericFunctionDef_t get_generic(HIR::expr_t node) {
-    if (node == nullptr) {
-      return nullptr;
-    }
-    switch (node->expr_kind) {
-      case HIR::expr_::ExprKind::kId: {
-        HIR::Id_t id = dynamic_cast<HIR::Id_t>(node);
-        HIR::resolved_t ref = id->ref;
-        if (ref == nullptr) {
-          return nullptr;
-        }
-        switch (ref->resolved_kind) {
-          case HIR::resolved_::ResolvedKind::kGenericFuncRef: {
-            HIR::GenericFuncRef_t func =
-              dynamic_cast<HIR::GenericFuncRef_t>(ref);
-            HIR::GenericFunctionDef_t def =
-              dynamic_cast<HIR::GenericFunctionDef_t>(func->ref);
-            return def;
-          }
-          default:
-            return nullptr;
-        }
-      }
-      default:
-         return nullptr;
     }
   }
 
@@ -1150,6 +1153,16 @@ class SemaVisitor : public AST::BaseVisitor {
       err_msg = "unable to match overloaded function " + id->s + err_msg;
     }
     return err_msg;
+  }
+
+  // replace the OverloadedId with the first Id
+  HIR::expr_t unoverload(HIR::expr_t node) {
+    if (is_overloaded(node)) {
+      HIR::OverloadedId_t id = dynamic_cast<HIR::OverloadedId_t>(node);
+      HIR::resolved_t ref = id->refs[0];
+      return HIR::Id(id->s, ref, id->type, id->traits, id->mode, id->s);
+    }
+    return node;
   }
 
   // create an anonymous function name
@@ -1468,17 +1481,7 @@ class SemaVisitor : public AST::BaseVisitor {
       HIR::FunctionDef(node->name, templates, args, body, explicit_rettype,
                        node->docstring, rettype, empty_traits);
     HIR::FunctionDef_t fd = dynamic_cast<HIR::FunctionDef_t>(new_node);
-    // missing argument types implies generic function
-    HIR::stmt_t generic = nullptr;
-    for (AST::declaration_t a: node->args) {
-      if (a->explicit_type == nullptr) {
-        std::vector<HIR::stmt_t> instantiated;
-        generic = HIR::GenericFunctionDef(new_node, instantiated);
-        break;
-      }
-    }
-    HIR::resolved_t ref = generic ? HIR::GenericFuncRef(generic)
-                                  : HIR::FuncRef(new_node);
+    HIR::resolved_t ref = HIR::FuncRef(new_node);
     // store name in outer scope
     current_scope_ = outer_scope;
     if (!store_symbol(node->name, ref)) {
@@ -1548,10 +1551,64 @@ class SemaVisitor : public AST::BaseVisitor {
       // remove from scope if an error had occurred
       remove_symbol_ref(node->name, ref);
     }
-    return generic ? generic : new_node;
+    return new_node;
+  }
+
+  antlrcpp::Any visitGenericDef(AST::GenericDef_t node) override {
+    size_t starting_err_length = sema_err_.str().size();
+    // get name
+    AST::FunctionDef_t fd = dynamic_cast<AST::FunctionDef_t>(node->original);
+    std::string name = fd->name;
+
+    // get explicit return type
+    HIR::expr_t explicit_rettype = nullptr;
+    if (node->explicit_rettype) {
+      explicit_rettype = visit(node->explicit_rettype);
+    }
+    HIR::datatype_t rettype = nullptr;
+    if (explicit_rettype != nullptr) {
+      if (is_kind_type(explicit_rettype->type)) {
+        rettype = get_underlying_type(explicit_rettype->type);
+      } else {
+        sema_err_ << "Error: return type for " << name
+                  << " has invalid type" << std::endl;
+      }
+    }
+
+    // evaluate arguments in new scope
+    push_scope();
+    std::vector<HIR::declaration_t> args;
+    for (AST::declaration_t a: node->args) {
+      HIR::declaration_t d = visit(a);
+      d->traits = all_traits;
+      d->mode = HIR::compmode_t::kNormal;
+      args.push_back(d);
+    }
+    pop_scope();
+
+    // until explicit traits are a thing
+    size_t traits = all_traits;
+
+    // construct node
+    std::vector<HIR::stmt_t> instantiated;
+    HIR::stmt_t new_node =
+      HIR::GenericDef(node->original, args, explicit_rettype, rettype, traits,
+                      instantiated);
+    HIR::resolved_t ref = HIR::GenericRef(new_node);
+
+    // store node
+    if (sema_err_.str().size() == starting_err_length) {
+      if (!store_symbol(name, ref)) {
+        sema_err_ << "Error: symbol " << name
+                  << " was already defined" << std::endl;
+      }
+    }
+
+    return new_node;
   }
 
   antlrcpp::Any visitTemplateDef(AST::TemplateDef_t node) override {
+    size_t starting_err_length = sema_err_.str().size();
     // evaluate template parameters in a new scope
     push_scope();
     std::vector<HIR::declaration_t> templates;
@@ -1559,11 +1616,14 @@ class SemaVisitor : public AST::BaseVisitor {
       HIR::declaration_t d = visit(t);
       d->traits = all_traits;
       d->mode = HIR::compmode_t::kComptime;
+      if (d->type == nullptr) {
+        d->type = HIR::Kind(nullptr);
+      }
       templates.push_back(d);
     }
     pop_scope();
 
-    // construct node and store it
+    // construct node
     std::vector<HIR::stmt_t> instantiated;
     std::string name;
     AST::stmt_t original = reinterpret_cast<AST::stmt_t>(node->original);
@@ -1574,9 +1634,13 @@ class SemaVisitor : public AST::BaseVisitor {
     }
     HIR::stmt_t new_node = HIR::TemplateDef(original, templates, instantiated);
     HIR::resolved_t ref = HIR::TemplateRef(new_node);
-    if (!store_symbol(name, ref)) {
-      sema_err_ << "Error: symbol " << name
-                << " was already defined" << std::endl;
+
+    // store node
+    if (sema_err_.str().size() == starting_err_length) {
+      if (!store_symbol(name, ref)) {
+        sema_err_ << "Error: symbol " << name
+                  << " was already defined" << std::endl;
+      }
     }
 
     return new_node;
@@ -1698,6 +1762,11 @@ class SemaVisitor : public AST::BaseVisitor {
       if (dt == HIR::decltype_t::kVar) {
         d->traits = empty_traits;
         d->mode = HIR::compmode_t::kNormal;
+      }
+      if (d->type == nullptr) {
+        sema_err_ << "Error: unable to determine type for " << d->name
+                  << std::endl;
+        remove_symbol(d->name);
       }
       decls.push_back(d);
     }
@@ -2059,6 +2128,8 @@ class SemaVisitor : public AST::BaseVisitor {
   }
 
   antlrcpp::Any visitFunctionCall(AST::FunctionCall_t node) override {
+    size_t starting_err_length = sema_err_.str().size();
+    // get function and arguments
     HIR::expr_t func = visit(node->func);
     if (!is_callable(func->type)) {
       sema_err_ << "Error: type " << to_string(func->type)
@@ -2068,74 +2139,51 @@ class SemaVisitor : public AST::BaseVisitor {
     for (AST::expr_t e: node->args) {
       args.push_back(visit(e));
     }
-    // check for generic functions
-    HIR::GenericFunctionDef_t generic = get_generic(func);
-    if (generic != nullptr) {
-      // check instantiated items first
-      bool previously_instantiated = false;
-      for (HIR::stmt_t instantiated: generic->instantiated_funcs) {
-        HIR::FunctionDef_t def =
-          dynamic_cast<HIR::FunctionDef_t>(instantiated);
-        HIR::datatype_t func_type = get_type(def);
-        std::string result = match_args(args, func_type);
-        if (result.empty()) {
-          // replace generic with previously instantiated function
-          HIR::resolved_t ref = FuncRef(def);
-          func = HIR::Id(def->name, ref, func_type, def->traits,
-                         HIR::compmode_t::kNormal, def->name);
-          previously_instantiated = true;
-          break;
-        }
-      }
-      // create new instance since nothing appropriate found
-      if (!previously_instantiated) {
-        HIR::FunctionDef_t def =
-          dynamic_cast<HIR::FunctionDef_t>(generic->original_func);
-        HIR::datatype_t func_type = get_type(def);
-        std::string err_msg = match_args(args, func_type);
-        if (err_msg.empty()) {
-          // fill nullptr using args
-          std::vector<HIR::declaration_t> new_args;
-          std::vector<HIR::datatype_t> argtypes = get_argtypes(func_type);
-          for (size_t i = 0; i < args.size(); i++) {
-            HIR::datatype_t type =
-              argtypes[i] != nullptr ? argtypes[i] : args[i]->type;
-            new_args.push_back(
-              HIR::declaration(def->args[i]->name, nullptr,
-                               def->args[i]->value, def->args[i]->dt, type,
-                               empty_traits, HIR::compmode_t::kNormal,
-                               nullptr, 0));
-          }
-          // TODO recursively copy def's body (needs HIR visitor)
-          std::vector<HIR::stmt_t> new_body;
-          // generate function
-          std::vector<HIR::declaration_t> templates;
-          HIR::stmt_t new_def =
-            HIR::FunctionDef(def->name, templates, new_args, new_body, nullptr,
-                             def->docstring, def->rettype, empty_traits);
-          generic->instantiated_funcs.push_back(new_def);
-          HIR::resolved_t ref = FuncRef(new_def);
-          HIR::FunctionDef_t node = dynamic_cast<HIR::FunctionDef_t>(new_def);
-          HIR::datatype_t new_func_type = get_type(node);
-          func = HIR::Id(def->name, ref, new_func_type, empty_traits,
-                         HIR::compmode_t::kNormal, def->name);
-        } else {
-          sema_err_ << "Error: " << err_msg << std::endl;
-        }
-      }
-    } else if (is_overloaded(func)) {
-      // check for overloaded functions
+    // verify arguments
+    if (is_overloaded(func)) {
       std::string err_msg = choose_overloaded(func, args);
       if (!err_msg.empty()) {
         sema_err_ << "Error: " << err_msg << std::endl;
       }
     } else {
-      // regular (non-overloaded, non-generic) function
       std::string err_msg = match_args(args, func->type);
       if (!err_msg.empty()) {
         sema_err_ << "Error: " << err_msg << std::endl;
       }
     }
+
+    // instantiate generic function (if no errors occurred so far)
+    if (sema_err_.str().size() == starting_err_length) {
+      HIR::Id_t id = is_id(func) ? dynamic_cast<HIR::Id_t>(func) : nullptr;
+      if (id != nullptr && is_generic(id->ref)) {
+        // search to see if this already exists
+        std::string instantiated_name = id->s + to_string_generics(args);
+        Scope::Resolveds resolveds = find_symbol(instantiated_name);
+        // build it
+        if (resolveds.empty()) {
+          // extract definition
+          HIR::GenericRef_t ref = dynamic_cast<HIR::GenericRef_t>(id->ref);
+          HIR::GenericDef_t def = dynamic_cast<HIR::GenericDef_t>(ref->ref);
+          AST::FunctionDef_t original =
+            reinterpret_cast<AST::FunctionDef_t>(def->original);
+          // fill AST declarations with the argument values; run visitor
+          for (size_t i = 0; i < node->args.size(); i++) {
+            original->args[i]->value = node->args[i];
+          }
+          original->name = instantiated_name;
+          HIR::stmt_t new_def = visit(original);
+          def->instantiated.push_back(new_def);
+          resolveds = find_symbol(instantiated_name);
+        }
+        //get info
+        HIR::resolved_t ptr = resolveds.empty() ? nullptr : resolveds[0];
+        HIR::datatype_t type = get_type(ptr);
+        Traits traits = get_traits(ptr);
+        HIR::compmode_t mode = get_mode(ptr);
+        func = HIR::Id(instantiated_name, ptr, type, traits, mode, id->name);
+      }
+    }
+
     // try to invoke function now internally
     HIR::expr_t attempt = attempt_sema_function(func, args);
     if (attempt != nullptr) {
@@ -2342,7 +2390,7 @@ class SemaVisitor : public AST::BaseVisitor {
     // get template parameters and extract non-types as literals
     std::vector<HIR::expr_t> templates;
     for (AST::expr_t t: node->templates) {
-      templates.push_back(visit(t));
+      templates.push_back(unoverload(visit(t)));
     }
     std::vector<HIR::expr_t> literals;
     for (size_t i = 0; i < templates.size(); i++) {
@@ -2506,7 +2554,7 @@ class SemaVisitor : public AST::BaseVisitor {
     // get explcit type
     HIR::expr_t explicit_type = nullptr;
     if (node->explicit_type) {
-      explicit_type = visit(node->explicit_type);
+      explicit_type = unoverload(visit(node->explicit_type));
     }
     HIR::datatype_t type = nullptr;
     if (explicit_type != nullptr) {
@@ -2529,9 +2577,6 @@ class SemaVisitor : public AST::BaseVisitor {
       sema_err_ << "Error: type of declaration does not match: "
                 << to_string(type) << " vs " << to_string(value->type)
                 << std::endl;
-    }
-    if (type == nullptr) {
-      sema_err_ << "Error: unable to determine type" << std::endl;
     }
     if (is_void_type(type)) {
       sema_err_ << "Error: symbol cannot have a 'void' type" << std::endl;

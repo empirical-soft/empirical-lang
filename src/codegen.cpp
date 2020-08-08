@@ -297,17 +297,18 @@ class CodegenVisitor : public HIR::BaseVisitor {
     return result;
   }
 
-  antlrcpp::Any visitTemplateDef(HIR::TemplateDef_t node) override {
+  antlrcpp::Any visitGenericDef(HIR::GenericDef_t node) override {
     for (HIR::stmt_t i: node->instantiated) {
       visit(i);
     }
     return VVM::operand_t(0);
   }
 
-  antlrcpp::Any visitGenericFunctionDef(HIR::GenericFunctionDef_t node)
-    override {
-    nyi("GenericFunctionDef");
-    return 0;
+  antlrcpp::Any visitTemplateDef(HIR::TemplateDef_t node) override {
+    for (HIR::stmt_t i: node->instantiated) {
+      visit(i);
+    }
+    return VVM::operand_t(0);
   }
 
   antlrcpp::Any visitDataDef(HIR::DataDef_t node) override {
@@ -1080,7 +1081,7 @@ class CodegenVisitor : public HIR::BaseVisitor {
   antlrcpp::Any visitDeclRef(HIR::DeclRef_t node) override {
     HIR::declaration_t decl = node->ref;
     // use comptime literal if it's available
-    if (decl->dt == HIR::decltype_t::kLet &&
+    if (decl->mode == HIR::compmode_t::kComptime &&
         decl->comptime_literal != nullptr) {
       return visit(decl->comptime_literal);
     }
@@ -1096,14 +1097,14 @@ class CodegenVisitor : public HIR::BaseVisitor {
     return direct_repr("<func: " + fd->name + ">");
   }
 
+  antlrcpp::Any visitGenericRef(HIR::GenericRef_t node) override {
+    // we only reach this node if the user requests it via REPL
+    return direct_repr("<generic func>");
+  }
+
   antlrcpp::Any visitTemplateRef(HIR::TemplateRef_t node) override {
     // we only reach this node if the user requests it via REPL
     return direct_repr("<template>");
-  }
-
-  antlrcpp::Any visitGenericFuncRef(HIR::GenericFuncRef_t node) override {
-    nyi("GenericFuncRef");
-    return 0;
   }
 
   antlrcpp::Any visitDataRef(HIR::DataRef_t node) override {

@@ -60,7 +60,7 @@ If no initial value and no type are provided, then we have an error.
 
 ```
 >>> var user_age
-Error: unable to determine type
+Error: unable to determine type for user_age
 
 ```
 
