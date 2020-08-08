@@ -11,10 +11,11 @@ module HIR
                      declaration* args, stmt* body,
                      expr? explicit_rettype, string? docstring,
                      datatype rettype, size_t traits)
-       | TemplateFunctionDef(pointer original, declaration* templates,
-                             stmt* instantiated)
+       | TemplateDef(pointer original, declaration* templates,
+                     stmt* instantiated)
        | GenericFunctionDef(stmt original_func, stmt* instantiated_funcs)
-       | DataDef(identifier name, declaration* body, size_t scope)
+       | DataDef(identifier name, declaration* templates, declaration* body,
+                 size_t scope)
        | Return(expr? value, expr? comptime_literal)
        | If(expr test, stmt* body, stmt* orelse)
        | While(expr test, stmt* body)
@@ -80,13 +81,13 @@ module HIR
            | UDT(identifier s, resolved ref)
            | Array(datatype type)
            | FuncType(datatype* argtypes, datatype rettype, size_t traits)
-           | TemplateFuncType(datatype* types)
+           | TemplateType(datatype* types)
            | Kind(datatype type)
            | Void
 
   resolved = DeclRef(declaration ref)
            | FuncRef(stmt ref)
-           | TemplateFuncRef(stmt ref)
+           | TemplateRef(stmt ref)
            | GenericFuncRef(stmt ref)
            | DataRef(stmt ref)
            | ModRef(mod ref)

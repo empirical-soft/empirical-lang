@@ -37,3 +37,17 @@ print(add{Float64}(3.0, 4.0))
 print(add{String}("three", "four"))
 ##threefour
 
+# type definition
+data Person{T: Type}:
+  name: String,
+  age: T
+end
+
+let x = Person{Float64}("A", 1.2).name
+print(x)
+##A
+
+let y = !Person{Int64}(["A", "B"], [13, 27]).age[1]
+print(y)
+##27
+

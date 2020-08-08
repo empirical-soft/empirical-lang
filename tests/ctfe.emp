@@ -1,5 +1,5 @@
 # These examples are run via compile-time function evaluation.
-# Enable --dump-vvm to see how the comptime values have been elided.
+# Enable --dump-vvm to see how the comptime literals have been elided.
 
 func inc(x: Int64):
   return x + 1
@@ -14,14 +14,18 @@ data Person:
   age: Int64
 end
 
-let p = Person("a", 1)
+let p = Person("a", 123)
 let y = p.age
 print(y)
-##1
+##123
+
+let df_p = !Person(["a", "b"], [1, 2]).name[1]
+print(df_p)
+##b
 
 let z = compile("x + y")
 print(z)
-##9
+##131
 
 func foo(x: Int64):
   let temp1 = 1

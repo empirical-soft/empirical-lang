@@ -32,9 +32,7 @@ class CodegenVisitor : public HIR::BaseVisitor {
         HIR::UDT_t udt = dynamic_cast<HIR::UDT_t>(node);
         HIR::DataRef_t dr = dynamic_cast<HIR::DataRef_t>(udt->ref);
         HIR::DataDef_t dd = dynamic_cast<HIR::DataDef_t>(dr->ref);
-        auto iter = type_map_.find(dd->scope);
-        VVM::type_t typee = (iter != type_map_.end())
-                              ? iter->second : VVM::type_t(visitDataDef(dd));
+        VVM::type_t typee = type_map_get(dd);
         return VVM::decode_type(typee);
       }
       case HIR::datatype_::DatatypeKind::kArray: {
@@ -42,7 +40,7 @@ class CodegenVisitor : public HIR::BaseVisitor {
         return get_vvm_type(arr->type, 'v');
       }
       case HIR::datatype_::DatatypeKind::kFuncType:
-      case HIR::datatype_::DatatypeKind::kTemplateFuncType:
+      case HIR::datatype_::DatatypeKind::kTemplateType:
       case HIR::datatype_::DatatypeKind::kKind:
       case HIR::datatype_::DatatypeKind::kVoid: {
         return "?";
@@ -63,6 +61,12 @@ class CodegenVisitor : public HIR::BaseVisitor {
   // map a UDT's scope to a VVM type code
   std::unordered_map<size_t, VVM::type_t> type_map_;
   VVM::type_t last_type_ = 0;
+
+  // return type or make it on demand
+  VVM::type_t type_map_get(HIR::DataDef_t dd) {
+    auto iter = type_map_.find(dd->scope);
+    return (iter != type_map_.end()) ? iter->second : VVM::type_t(visit(dd));
+  }
 
   // claim type code; user must map HIR scope if necessary
   VVM::type_t reserve_type(VVM::TypeMask mask = VVM::TypeMask::kUserDefined) {
@@ -104,6 +108,13 @@ class CodegenVisitor : public HIR::BaseVisitor {
   std::unordered_map<HIR::FunctionDef_t, VVM::operand_t> func_map_;
   std::unordered_map<HIR::expr_t, VVM::operand_t> implied_reg_map_;
   std::vector<size_t> last_operands_ = {0, 0, 0};
+
+  // return function or make it on demand
+  VVM::operand_t func_map_get(HIR::FunctionDef_t fd) {
+    auto iter = func_map_.find(fd);
+    return (iter != func_map_.end()) ? iter->second
+                                     : VVM::operand_t(visit(fd));
+  }
 
   // claim register space; map HIR node if necessary
   VVM::operand_t reserve_space(VVM::OpMask mask = VVM::OpMask::kLocal) {
@@ -269,12 +280,7 @@ class CodegenVisitor : public HIR::BaseVisitor {
     for (auto decl: node->templates) {
       if (decl->comptime_literal != nullptr) {
         // template was a value, as opposed to a type
-        VVM::operand_t target = reserve_space();
-        reg_map_[decl] = target;
-        VVM::operand_t typee = get_type_operand(decl->type);
-        emit(VVM::opcodes::alloc, {typee, target});
-        VVM::operand_t value = visit(decl->comptime_literal);
-        emit(VVM::opcodes::assign, {value, typee, target});
+        visit(decl);
       }
     }
     // recursively visit body
@@ -291,8 +297,7 @@ class CodegenVisitor : public HIR::BaseVisitor {
     return result;
   }
 
-  antlrcpp::Any visitTemplateFunctionDef(HIR::TemplateFunctionDef_t node)
-    override {
+  antlrcpp::Any visitTemplateDef(HIR::TemplateDef_t node) override {
     for (HIR::stmt_t i: node->instantiated) {
       visit(i);
     }
@@ -383,21 +388,7 @@ class CodegenVisitor : public HIR::BaseVisitor {
 
   antlrcpp::Any visitDecl(HIR::Decl_t node) override {
     for (auto d: node->decls) {
-      // reserve some space
-      VVM::operand_t target = reserve_space();
-      reg_map_[d] = target;
-      VVM::operand_t typee = get_type_operand(d->type);
-      emit(VVM::opcodes::alloc, {typee, target});
-
-      // assign the value
-      // TODO should "move" temporaries and "copy" otherwise
-      if (d->comptime_literal != nullptr) {
-        VVM::operand_t value = visit(d->comptime_literal);
-        emit(VVM::opcodes::assign, {value, typee, target});
-      } else if (d->value != nullptr) {
-        VVM::operand_t value = visit(d->value);
-        emit(VVM::opcodes::assign, {value, typee, target});
-      }
+      visit(d);
     }
     return VVM::operand_t(0);
   }
@@ -771,11 +762,7 @@ class CodegenVisitor : public HIR::BaseVisitor {
         // invoke user-defined functions
         HIR::FuncRef_t fr = dynamic_cast<HIR::FuncRef_t>(ref);
         HIR::FunctionDef_t fd = dynamic_cast<HIR::FunctionDef_t>(fr->ref);
-        if (func_map_.find(fd) == func_map_.end()) {
-          // make function on demand; this happens with templates in REPL
-          visit(fd);
-        }
-        VVM::operand_t op = func_map_[fd];
+        VVM::operand_t op = func_map_get(fd);
         result = reserve_space();
         params.push_back(result);
         VVM::operand_t length =
@@ -1016,8 +1003,23 @@ class CodegenVisitor : public HIR::BaseVisitor {
   }
 
   antlrcpp::Any visitDeclaration(HIR::declaration_t node) override {
-    invalid("visitDeclaration");
-    return 0;
+    // reserve some space
+    VVM::operand_t target = reserve_space();
+    reg_map_[node] = target;
+    VVM::operand_t typee = get_type_operand(node->type);
+    emit(VVM::opcodes::alloc, {typee, target});
+
+    // assign the value
+    // TODO should "move" temporaries and "copy" otherwise
+    if (node->comptime_literal != nullptr) {
+      VVM::operand_t value = visit(node->comptime_literal);
+      emit(VVM::opcodes::assign, {value, typee, target});
+    } else if (node->value != nullptr) {
+      VVM::operand_t value = visit(node->value);
+      emit(VVM::opcodes::assign, {value, typee, target});
+    }
+
+    return target;
   }
 
   antlrcpp::Any visitDecltype(HIR::decltype_t value) override {
@@ -1060,8 +1062,8 @@ class CodegenVisitor : public HIR::BaseVisitor {
     return 0;
   }
 
-  antlrcpp::Any visitTemplateFuncType(HIR::TemplateFuncType_t node) override {
-    nyi("TemplateFuncType");
+  antlrcpp::Any visitTemplateType(HIR::TemplateType_t node) override {
+    nyi("TemplateType");
     return 0;
   }
 
@@ -1076,7 +1078,16 @@ class CodegenVisitor : public HIR::BaseVisitor {
   }
 
   antlrcpp::Any visitDeclRef(HIR::DeclRef_t node) override {
-    return reg_map_[node->ref];
+    HIR::declaration_t decl = node->ref;
+    // use comptime literal if it's available
+    if (decl->dt == HIR::decltype_t::kLet &&
+        decl->comptime_literal != nullptr) {
+      return visit(decl->comptime_literal);
+    }
+    // return register or make it on demand
+    auto iter = reg_map_.find(decl);
+    return (iter != reg_map_.end()) ? iter->second
+                                    : VVM::operand_t(visit(decl));
   }
 
   antlrcpp::Any visitFuncRef(HIR::FuncRef_t node) override {
@@ -1085,7 +1096,7 @@ class CodegenVisitor : public HIR::BaseVisitor {
     return direct_repr("<func: " + fd->name + ">");
   }
 
-  antlrcpp::Any visitTemplateFuncRef(HIR::TemplateFuncRef_t node) override {
+  antlrcpp::Any visitTemplateRef(HIR::TemplateRef_t node) override {
     // we only reach this node if the user requests it via REPL
     return direct_repr("<template>");
   }
