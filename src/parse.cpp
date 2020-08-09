@@ -236,10 +236,22 @@ class ParseVisitor : public EmpiricalVisitor {
       explicit_rettype = visit(ctx->rettype);
     }
 
+    // determine if this was a generic function (no type listed for an arg)
+    bool is_generic = false;
+    for (AST::declaration_t a: args) {
+      if (a->explicit_type == nullptr) {
+        is_generic = true;
+        break;
+      }
+    }
+
     AST::stmt_t node = AST::FunctionDef(name, templates, args, body,
                                         explicit_rettype, docstring);
+    if (is_generic) {
+      node = AST::GenericDef(node, args, explicit_rettype);
+    }
     if (!templates.empty()) {
-      return AST::TemplateDef(node, templates);
+      node = AST::TemplateDef(node, templates);
     }
     return node;
   }

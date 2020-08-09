@@ -10,6 +10,7 @@ module AST
   stmt = FunctionDef(identifier name, declaration* templates,
                      declaration* args, stmt* body,
                      expr? explicit_rettype, string? docstring)
+       | GenericDef(stmt original, declaration* args, expr? explicit_rettype)
        | TemplateDef(stmt original, declaration* templates)
        | DataDef(identifier name, declaration* templates, declaration* body)
        | Return(expr? value)

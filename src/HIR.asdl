@@ -11,9 +11,11 @@ module HIR
                      declaration* args, stmt* body,
                      expr? explicit_rettype, string? docstring,
                      datatype rettype, size_t traits)
+       | GenericDef(pointer original, declaration* args,
+                    expr? explicit_rettype, datatype rettype, size_t traits,
+                    stmt* instantiated)
        | TemplateDef(pointer original, declaration* templates,
                      stmt* instantiated)
-       | GenericFunctionDef(stmt original_func, stmt* instantiated_funcs)
        | DataDef(identifier name, declaration* templates, declaration* body,
                  size_t scope)
        | Return(expr? value, expr? comptime_literal)
@@ -87,8 +89,8 @@ module HIR
 
   resolved = DeclRef(declaration ref)
            | FuncRef(stmt ref)
+           | GenericRef(stmt ref)
            | TemplateRef(stmt ref)
-           | GenericFuncRef(stmt ref)
            | DataRef(stmt ref)
            | ModRef(mod ref)
            | VVMOpRef(size_t opcode, datatype type)

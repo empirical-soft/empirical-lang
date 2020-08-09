@@ -94,6 +94,11 @@ Comptime
 >>> double_it{type_of(x)}(7)
 14
 
+>>> func triple_it{T}(a: T): return a + a + a end
+
+>>> triple_it{String}("Hello ")
+"Hello Hello Hello "
+
 ```
 
 ### Template Data
