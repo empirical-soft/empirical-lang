@@ -246,7 +246,7 @@ class ParseVisitor : public EmpiricalVisitor {
     }
 
     // this should be prevented by the grammar, but just to be safe
-    if (!body.empty() and single != nullptr) {
+    if (!body.empty() && single != nullptr) {
       parse_err_ << "Error: cannot mix expression syntax and statement syntax"
                  << std::endl;
     }
