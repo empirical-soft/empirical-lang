@@ -9,8 +9,8 @@ git tag -l --format="#### %(refname:strip=2)%09(%(creatordate:short))%0a%0a%(sub
 # Generate table of contents for tutorial
 
 cd doc
-cat tutorial_running.md tutorial_core.md | ../thirdparty/github-markdown-toc/gh-md-toc - | sed "s/^      //" > ../../website/_includes/tutorial_toc.md
-cp tutorial*.md ../../website/_includes/
+cat tutorial.md | ../thirdparty/github-markdown-toc/gh-md-toc - | sed "s/^      //" > ../../website/_includes/tutorial_toc.md
+cp tutorial.md ../../website/_includes/tutorial_contents.md
 cd ..
 
 # Change release number for downloads

@@ -8,7 +8,7 @@ module HIR
   mod = Module(stmt* body, string? docstring)
 
   stmt = FunctionDef(identifier name, declaration* templates,
-                     declaration* args, stmt* body,
+                     declaration* args, stmt* body, expr? single
                      expr? explicit_rettype, string? docstring,
                      datatype rettype, size_t traits)
        | GenericDef(pointer original, declaration* args,

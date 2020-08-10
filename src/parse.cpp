@@ -228,12 +228,27 @@ class ParseVisitor : public EmpiricalVisitor {
       args = visit(ctx->args).as<decltype(args)>();
     }
 
-    std::vector<AST::stmt_t> body = visit(ctx->body);
-    std::string docstring = extract_docstring(body);
-
     AST::expr_t explicit_rettype = nullptr;
     if (ctx->rettype) {
       explicit_rettype = visit(ctx->rettype);
+    }
+
+    std::vector<AST::stmt_t> body;
+    std::string docstring;
+    if (ctx->body) {
+      body = visit(ctx->body).as<decltype(body)>();
+      docstring = extract_docstring(body);
+    }
+
+    AST::expr_t single = nullptr;
+    if (ctx->single) {
+      single = visit(ctx->single);
+    }
+
+    // this should be prevented by the grammar, but just to be safe
+    if (!body.empty() and single != nullptr) {
+      parse_err_ << "Error: cannot mix expression syntax and statement syntax"
+                 << std::endl;
     }
 
     // determine if this was a generic function (no type listed for an arg)
@@ -245,7 +260,7 @@ class ParseVisitor : public EmpiricalVisitor {
       }
     }
 
-    AST::stmt_t node = AST::FunctionDef(name, templates, args, body,
+    AST::stmt_t node = AST::FunctionDef(name, templates, args, body, single,
                                         explicit_rettype, docstring);
     if (is_generic) {
       node = AST::GenericDef(node, args, explicit_rettype);

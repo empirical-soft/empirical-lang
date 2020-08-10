@@ -71,8 +71,8 @@ eos : ';' | EOF | {endAhead()}? | {nlAhead()}?;
 
 /* function definition */
 funcdef     : FUNC name=func_name ('{' templates=decl_list '}')?
-              '(' args=decl_list? ')' (ARROW rettype=expr)? ':'
-              body=suite END;
+              '(' args=decl_list? ')' (ARROW rettype=expr)?
+              ((':' body=suite END) | ('=' single=expr));
 func_name   : NAME | oper;
 decl_list   : declaration (',' declaration)*;
 declaration : name=NAME (':' type=expr)? ('=' value=expr)?;

@@ -1,3 +1,63 @@
+## Launching
+
+Launch Empirical from the command line to get the REPL.
+
+```skip
+$ path/to/empirical
+Empirical version 0.4.2
+Copyright (C) 2019--2020 Empirical Software Solutions, LLC
+
+>>>
+
+```
+
+Alternatively, include a file name to run it.
+
+```skip
+$ path/to/empirical file_to_run.emp
+
+```
+
+There are some advanced options on the command line to see the internal state of the compiler. Get the `--help` for the full list.
+
+```skip
+$ path/to/empirical --help
+
+```
+
+### Magic commands
+
+The REPL has some magic commands that may make development easier. For example, we can time an expression:
+
+```skip
+>>> \t let p = load$("prices.csv")
+
+ 1ms
+
+```
+
+We can enter multiline statements (pasting is currently not permitted, unfortunately):
+
+```skip
+>>> \multiline
+# Entering multiline mode (Ctrl-D to exit)
+func add(x: Int64, y: Int64):
+  return x + y
+end
+^D
+
+>>> add(2, 3)
+5
+
+```
+
+To see all available magic commands, just ask for `\help`.
+
+```skip
+>>> \help
+
+```
+
 ## Expressions and Variables
 
 Expressions are evaluated and the results are returned to the user.
@@ -132,6 +192,8 @@ nil
 
 ```
 
+### User-defined types
+
 Users can define their own values.
 
 ```
@@ -159,7 +221,7 @@ These are displayed as a table by default.
 We can define a type cast if desired.
 
 ```
->>> func String(p: Person): return p.name + " is " + String(p.age) + " years old" end
+>>> func String(p: Person) = p.name + " is " + String(p.age) + " years old"
 
 >>> String(p)
 "Bob is 37 years old"
@@ -173,6 +235,22 @@ Prepending a user-defined type with a bang (`!`) changes the type to a Dataframe
   name age
  Alice  37
    Bob  39
+
+```
+
+User-defined types can accept *templates*.
+
+```
+>>> data Person2{AgeType}: name: String, age: AgeType end
+
+>>> Person2{Int64}("A", 1)
+ name age
+    A   1
+
+>>> !Person2{Float64}(["A", "B"], [1.1, 1.2])
+ name age
+    A 1.1
+    B 1.2
 
 ```
 
@@ -200,6 +278,9 @@ Person
 
 >>> Person
 <type: Person>
+
+>>> Person2
+<template>
 
 ```
 
@@ -263,20 +344,43 @@ The type can be recalled.
 
 ## Functions
 
-Functions apply to a list of parameters.
+Functions apply to a list of arguments.
 
 ```
->>> func add(x: Int64, y: Int64): return x + y end
+>>> func add(x, y) = x + y
 
 >>> add(3, 7)
 10
 
+>>> add("A", "B")
+"AB"
+
 ```
 
-The return type is inferred, but may be explicitly listed.
+The above is an example of *expression syntax*, where the function is defined as a single expression. Functions can also be defined with *statement syntax* with an explicit `return`.
 
 ```
->>> func add3(x: Int64, y: Int64, z: Int64) -> Int64: return add(add(x, y), z) end
+>>> func mult(x, y): return x * y end
+
+>>> mult(3, 7)
+21
+
+>>> mult(0.1, 0.9)
+0.09
+
+```
+
+The argument types are determined from the caller, but can be listed explicitly.
+
+```
+>>> func add2(x: Int64, y: Int64): return x + y end
+
+```
+
+The return type is inferred, but may be listed explicitly.
+
+```
+>>> func add3(x: Int64, y: Int64, z: Int64) -> Int64: return add2(add2(x, y), z) end
 
 >>> add3(4, 5, 6)
 15
@@ -296,12 +400,12 @@ Functions can, of course, be recursive.
 Functions can be overloaded by parameter type.
 
 ```
->>> func add(x: Bool, y: Bool): return x or y end
+>>> func add2(x: Bool, y: Bool): return x or y end
 
->>> add(true, false)
+>>> add2(true, false)
 true
 
->>> add(1, 0)
+>>> add2(1, 0)
 1
 
 ```
@@ -309,12 +413,38 @@ true
 An error occurs if types don't match during a function call.
 
 ```
->>> add(3.4, 5.6)
-Error: unable to match overloaded function add
+>>> add2(3.4, 5.6)
+Error: unable to match overloaded function add2
   candidate: (Int64, Int64) -> Int64
     argument type at position 0 does not match: Float64 vs Int64
   candidate: (Bool, Bool) -> Bool
     argument type at position 0 does not match: Float64 vs Bool
+
+```
+
+Functions can take templates of course.
+
+```
+>>> func mult2{T}(x: T, y: T) = x * y
+
+>>> mult2{Int64}(4, 6)
+24
+
+>>> mult2{Float64}(4.0, 6.0)
+24.0
+
+```
+
+The template parameter is a `Type` by default, but value parameters are also permitted.
+
+```
+>>> func inc{i: Int64}(x: Int64) = x + i
+
+>>> inc{1}(7)
+8
+
+>>> inc{10}(7)
+17
 
 ```
 
@@ -331,7 +461,7 @@ Operators can be overloaded.
 ```
 >>> data Point: x: Int64, y: Int64 end
 
->>> func (+)(p: Point, n: Int64): return Point(p.x + n, p.y + n) end
+>>> func (+)(p: Point, n: Int64) = Point(p.x + n, p.y + n)
 
 >>> Point(5, 7) + 12
   x  y
@@ -342,7 +472,7 @@ Operators can be overloaded.
 User-defined literals can be defined by prepending `suffix` to any function name.
 
 ```
->>> func suffix_w(x: Int64): return x * 3 end
+>>> func suffix_w(x: Int64) = x * 3
 
 >>> 7_w
 21
@@ -360,6 +490,12 @@ User-defined literals can be defined by prepending `suffix` to any function name
 A function's type information is available as well.
 
 ```
+>>> add
+<generic func>
+
+>>> type_of(add)
+(_, _) -> _
+
 >>> add3
 <func: add3>
 
@@ -374,6 +510,12 @@ overloaded:
   ([Int64]) -> Int64
   ([Float64]) -> Float64
   ([String]) -> String
+
+>>> inc
+<template>
+
+>>> type_of(inc{1})
+(Int64) -> Int64
 
 ```
 
