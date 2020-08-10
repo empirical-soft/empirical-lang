@@ -1477,9 +1477,11 @@ class SemaVisitor : public AST::BaseVisitor {
     }
     // create shell now so body can have recursion
     std::vector<HIR::stmt_t> body;
+    HIR::expr_t single = nullptr;
     HIR::stmt_t new_node =
-      HIR::FunctionDef(node->name, templates, args, body, explicit_rettype,
-                       node->docstring, rettype, empty_traits);
+      HIR::FunctionDef(node->name, templates, args, body, single,
+                       explicit_rettype, node->docstring, rettype,
+                       empty_traits);
     HIR::FunctionDef_t fd = dynamic_cast<HIR::FunctionDef_t>(new_node);
     HIR::resolved_t ref = HIR::FuncRef(new_node);
     // store name in outer scope
@@ -1494,7 +1496,13 @@ class SemaVisitor : public AST::BaseVisitor {
     for (AST::stmt_t b: node->body) {
       body.push_back(visit(b));
     }
+    // evaluate single expression as if it were a return statement
+    if (node->single) {
+      single = nullptr;
+      body.push_back(visit(AST::Return(node->single)));
+    }
     fd->body = body;
+    fd->single = single;
     pop_scope();
     // get body's return type
     HIR::datatype_t body_rettype = nullptr;

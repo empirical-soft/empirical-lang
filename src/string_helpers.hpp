@@ -47,19 +47,22 @@ typedef std::vector<TestPair> Tests;
 Tests parse_markdown(const std::string& contents) {
   Tests tests;
 
-  bool inticks = false;
+  bool inticks = false, skip = false;
   size_t line = 1;
   const std::string TICKS = "```";
   const std::string PROMPT = ">>> ";
+  const std::string SKIP = "skip";
 
   for (size_t i = 0; i < contents.size(); ) {
     if (starts_with(contents, TICKS, i)) {
+      i += TICKS.size();
+      skip = starts_with(contents, SKIP, i);
       inticks = !inticks;
       while (i < contents.size() && contents[i++] != '\n')
         ;
       line++;
     }
-    if (inticks) {
+    if (inticks && !skip) {
       if (starts_with(contents, PROMPT, i)) {
         // testable input
         std::string in;
