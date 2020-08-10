@@ -126,6 +126,26 @@ class CodegenVisitor : public HIR::BaseVisitor {
   // non-immediate constant values are stored in a pool
   VVM::const_pool_t constants_;
 
+  // store a constant in the pool; save unique literals in a cache
+  template<class T>
+  VVM::operand_t store_constant(T value,
+                                std::unordered_map<T, VVM::operand_t>& cache) {
+    auto iter = cache.find(value);
+    if (iter != cache.end()) {
+      return iter->second;
+    }
+
+    VVM::operand_t key = reserve_space(VVM::OpMask::kGlobal);
+    constants_[key] = VVM::encode_ptr(new T(value));
+    cache[value] = key;
+    return key;
+  }
+
+  // these can't be static to the class because we have multiple VM objects
+  std::unordered_map<int64_t, VVM::operand_t> integer_register_cache;
+  std::unordered_map<double, VVM::operand_t> floating_register_cache;
+  std::unordered_map<std::string, VVM::operand_t> string_register_cache;
+
   /* basic blocks */
 
   // instead of using a control-flow graph, define blocks as an integer
@@ -907,15 +927,11 @@ class CodegenVisitor : public HIR::BaseVisitor {
       return VVM::encode_operand(node->n, VVM::OpMask::kImmediate);
     }
 
-    VVM::operand_t key = reserve_space(VVM::OpMask::kGlobal);
-    constants_[key] = VVM::encode_ptr(new int64_t(node->n));
-    return key;
+    return store_constant(node->n, integer_register_cache);
   }
 
   antlrcpp::Any visitFloatingLiteral(HIR::FloatingLiteral_t node) override {
-    VVM::operand_t key = reserve_space(VVM::OpMask::kGlobal);
-    constants_[key] = VVM::encode_ptr(new double(node->n));
-    return key;
+    return store_constant(node->n, floating_register_cache);
   }
 
   antlrcpp::Any visitBoolLiteral(HIR::BoolLiteral_t node) override {
@@ -923,9 +939,7 @@ class CodegenVisitor : public HIR::BaseVisitor {
   }
 
   antlrcpp::Any visitStr(HIR::Str_t node) override {
-    VVM::operand_t key = reserve_space(VVM::OpMask::kGlobal);
-    constants_[key] = VVM::encode_ptr(new std::string(node->s));
-    return key;
+    return store_constant(node->s, string_register_cache);
   }
 
   antlrcpp::Any visitChar(HIR::Char_t node) override {

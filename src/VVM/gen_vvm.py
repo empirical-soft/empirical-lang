@@ -515,6 +515,7 @@ class BuiltinsWriter(HeaderWriter):
                      'store': none,
                      'print': none,
                      'unique': ca_traits,
+                     'filter': ca_traits,
                      'idx': ra_traits,
                      'multidx': ra_traits,
                      'sort': ra_traits,
