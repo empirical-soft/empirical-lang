@@ -1529,19 +1529,14 @@ class SemaVisitor : public AST::BaseVisitor {
                 << " vs " << to_string(body_rettype) << std::endl;
     }
     // check if this had been a cast definition
-    if (isupper(node->name[0])) {
-      Scope::Resolveds resolveds = find_symbol(node->name);
-      HIR::datatype_t cast_type = get_type(resolveds[0]);
-      if (is_kind_type(cast_type)) {
-        HIR::datatype_t expected = get_underlying_type(cast_type);
-        if (!is_same_type(rettype, expected) &&
-            !is_same_type(rettype, HIR::Array(expected))) {
-          sema_err_ << "Error: cast definition for " << node->name
-                    << " must return its own type" << std::endl;
-        }
-      } else {
-        sema_err_ << "Error: cast definition must be for a type, not "
-                  << node->name << std::endl;
+    Scope::Resolveds resolveds = find_symbol(node->name);
+    HIR::datatype_t cast_type = get_type(resolveds[0]);
+    if (is_kind_type(cast_type)) {
+      HIR::datatype_t expected = get_underlying_type(cast_type);
+      if (!is_same_type(rettype, expected) &&
+          !is_same_type(rettype, HIR::Array(expected))) {
+        sema_err_ << "Error: cast definition for " << node->name
+                  << " must return its own type" << std::endl;
       }
     }
     // put everything together
