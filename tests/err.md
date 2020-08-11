@@ -85,6 +85,9 @@ Error: mismatched types in assignment: Int64 vs Float64
 >>> y = print("Hello")
 Error: type 'void' is not assignable
 
+>>> var z
+Error: unable to determine type for z
+
 ```
 
 ### Functions
@@ -93,5 +96,16 @@ Error: type 'void' is not assignable
 >>> x{3}
 Error: type Int64 is not a template
 Error: wrong number of arguments; expected 0 but got 1
+
+```
+
+### User-defined types
+
+```
+>>> data D = 1 + 2
+Error: cannot assign D to a value
+
+>>> data D: name: String, age end
+Error: unable to determine type for D.age
 
 ```

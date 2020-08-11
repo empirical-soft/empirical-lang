@@ -332,6 +332,11 @@ class CodegenVisitor : public HIR::BaseVisitor {
   }
 
   antlrcpp::Any visitDataDef(HIR::DataDef_t node) override {
+    // a rename does not trigger a build
+    if (node->body.empty()) {
+      return VVM::operand_t(0);
+    }
+    // build the type
     VVM::type_t typee = reserve_type();
     type_map_[node->scope] = typee;
     std::vector<VVM::named_type_t> types;
@@ -1002,6 +1007,11 @@ class CodegenVisitor : public HIR::BaseVisitor {
     return visit(node->subexpr);
   }
 
+  antlrcpp::Any visitAnonData(HIR::AnonData_t node) override {
+    // we only reach this node if the user requests it via REPL
+    return direct_repr("<anonymous type>");
+  }
+
   antlrcpp::Any visitSlice(HIR::Slice_t node) override {
     nyi("Slice");
     return 0;
@@ -1149,12 +1159,12 @@ class CodegenVisitor : public HIR::BaseVisitor {
 
   antlrcpp::Any visitSemaFuncRef(HIR::SemaFuncRef_t node) override {
     // we only reach this node if the user requests it via REPL
-    return direct_repr("<builtin func>");
+    return direct_repr("<func>");
   }
 
   antlrcpp::Any visitSemaTypeRef(HIR::SemaTypeRef_t node) override {
     // we only reach this node if the user requests it via REPL
-    return direct_repr("<builtin type>");
+    return direct_repr("<type>");
   }
 
  public:

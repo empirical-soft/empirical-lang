@@ -173,7 +173,8 @@ class ParseVisitor : public EmpiricalVisitor {
     return results;
   }
 
-  antlrcpp::Any visitSimple_stmt(EmpiricalParser::Simple_stmtContext *ctx) override {
+  antlrcpp::Any visitSimple_stmt(EmpiricalParser::Simple_stmtContext *ctx)
+    override {
     // a simple_stmt is a vector of stmt
     std::vector<AST::stmt_t> results;
     for (auto s: ctx->small_stmt()) {
@@ -182,11 +183,13 @@ class ParseVisitor : public EmpiricalVisitor {
     return results;
   }
 
-  antlrcpp::Any visitSmall_stmt(EmpiricalParser::Small_stmtContext *ctx) override {
+  antlrcpp::Any visitSmall_stmt(EmpiricalParser::Small_stmtContext *ctx)
+    override {
     return visitChildren(ctx);
   }
 
-  antlrcpp::Any visitCompound_stmt(EmpiricalParser::Compound_stmtContext *ctx) override {
+  antlrcpp::Any visitCompound_stmt(EmpiricalParser::Compound_stmtContext *ctx)
+    override {
     // vectorize a compound_stmt to be the same format as simple_stmt
     std::vector<AST::stmt_t> results;
     results.push_back(visitChildren(ctx));
@@ -271,14 +274,16 @@ class ParseVisitor : public EmpiricalVisitor {
     return node;
   }
 
-  antlrcpp::Any visitFunc_name(EmpiricalParser::Func_nameContext *ctx) override {
+  antlrcpp::Any visitFunc_name(EmpiricalParser::Func_nameContext *ctx)
+    override {
     if (ctx->oper()) {
       return visit(ctx->oper());
     }
     return ctx->getText();
   }
 
-  antlrcpp::Any visitDecl_list(EmpiricalParser::Decl_listContext *ctx) override {
+  antlrcpp::Any visitDecl_list(EmpiricalParser::Decl_listContext *ctx)
+    override {
     std::vector<AST::declaration_t> results;
     for (auto s: ctx->declaration()) {
       results.push_back(visit(s));
@@ -286,7 +291,8 @@ class ParseVisitor : public EmpiricalVisitor {
     return results;
   }
 
-  antlrcpp::Any visitDeclaration(EmpiricalParser::DeclarationContext *ctx) override {
+  antlrcpp::Any visitDeclaration(EmpiricalParser::DeclarationContext *ctx)
+    override {
     AST::identifier name(ctx->name->getText());
     AST::expr_t explicit_type = nullptr;
     if (ctx->type) {
@@ -309,9 +315,23 @@ class ParseVisitor : public EmpiricalVisitor {
       templates = visit(ctx->templates).as<decltype(templates)>();
     }
 
-    std::vector<AST::declaration_t> body = visit(ctx->body);
+    std::vector<AST::declaration_t> body;
+    if (ctx->body) {
+      body = visit(ctx->body).as<decltype(body)>();
+    }
 
-    AST::stmt_t node = AST::DataDef(name, templates, body);
+    AST::expr_t single = nullptr;
+    if (ctx->single) {
+      single = visit(ctx->single);
+    }
+
+    // this should be prevented by the grammar, but just to be safe
+    if (!body.empty() && single != nullptr) {
+      parse_err_ << "Error: cannot mix expression syntax and statement syntax"
+                 << std::endl;
+    }
+
+    AST::stmt_t node = AST::DataDef(name, templates, body, single);
     if (!templates.empty()) {
       return AST::TemplateDef(node, templates);
     }
@@ -344,7 +364,8 @@ class ParseVisitor : public EmpiricalVisitor {
     return AST::If(test, body, else_body);
   }
 
-  antlrcpp::Any visitWhile_stmt(EmpiricalParser::While_stmtContext *ctx) override {
+  antlrcpp::Any visitWhile_stmt(EmpiricalParser::While_stmtContext *ctx)
+    override {
     AST::expr_t test = visit(ctx->test);
     std::vector<AST::stmt_t> body = visit(ctx->body);
     return AST::While(test, body);
@@ -357,7 +378,8 @@ class ParseVisitor : public EmpiricalVisitor {
     return Del(target);
   }
 
-  antlrcpp::Any visitExpr_list(EmpiricalParser::Expr_listContext *ctx) override {
+  antlrcpp::Any visitExpr_list(EmpiricalParser::Expr_listContext *ctx)
+    override {
     std::vector<AST::expr_t> results;
     for (auto s: ctx->expr()) {
       results.push_back(visit(s));
@@ -367,16 +389,19 @@ class ParseVisitor : public EmpiricalVisitor {
 
   /* import statement */
 
-  antlrcpp::Any visitImport_stmt(EmpiricalParser::Import_stmtContext *ctx) override {
+  antlrcpp::Any visitImport_stmt(EmpiricalParser::Import_stmtContext *ctx)
+    override {
     return visitChildren(ctx);
   }
 
-  antlrcpp::Any visitImport_name(EmpiricalParser::Import_nameContext *ctx) override {
+  antlrcpp::Any visitImport_name(EmpiricalParser::Import_nameContext *ctx)
+    override {
     std::vector<AST::alias_t> names = visit(ctx->names);
     return AST::Import(names);
   }
 
-  antlrcpp::Any visitDotted_as_names(EmpiricalParser::Dotted_as_namesContext *ctx) override {
+  antlrcpp::Any visitDotted_as_names(EmpiricalParser::Dotted_as_namesContext
+                                     *ctx) override {
     std::vector<AST::alias_t> results;
     for (auto s: ctx->dotted_as_name()) {
       results.push_back(visit(s));
@@ -384,7 +409,8 @@ class ParseVisitor : public EmpiricalVisitor {
     return results;
   }
 
-  antlrcpp::Any visitDotted_as_name(EmpiricalParser::Dotted_as_nameContext *ctx) override {
+  antlrcpp::Any visitDotted_as_name(EmpiricalParser::Dotted_as_nameContext
+                                    *ctx) override {
     AST::expr_t value = visit(ctx->name);
     AST::identifier name;
     if (ctx->asname) {
@@ -393,7 +419,8 @@ class ParseVisitor : public EmpiricalVisitor {
     return AST::alias(value, name);
   }
 
-  antlrcpp::Any visitImport_from(EmpiricalParser::Import_fromContext *ctx) override {
+  antlrcpp::Any visitImport_from(EmpiricalParser::Import_fromContext *ctx)
+    override {
     std::vector<AST::alias_t> names;
     if (ctx->names) {
       names = visit(ctx->names).as<decltype(names)>();
@@ -402,7 +429,8 @@ class ParseVisitor : public EmpiricalVisitor {
     return AST::ImportFrom(module, names);
   }
 
-  antlrcpp::Any visitImport_as_names(EmpiricalParser::Import_as_namesContext *ctx) override {
+  antlrcpp::Any visitImport_as_names(EmpiricalParser::Import_as_namesContext
+                                     *ctx) override {
     std::vector<AST::alias_t> results;
     for (auto s: ctx->import_as_name()) {
       results.push_back(visit(s));
@@ -410,7 +438,8 @@ class ParseVisitor : public EmpiricalVisitor {
     return results;
   }
 
-  antlrcpp::Any visitImport_as_name(EmpiricalParser::Import_as_nameContext *ctx) override {
+  antlrcpp::Any visitImport_as_name(EmpiricalParser::Import_as_nameContext
+                                    *ctx) override {
     AST::identifier id(ctx->name->getText());
     AST::expr_t value = AST::Id(id);
     AST::identifier name;
@@ -420,7 +449,8 @@ class ParseVisitor : public EmpiricalVisitor {
     return AST::alias(value, name);
   }
 
-  antlrcpp::Any visitDotted_name(EmpiricalParser::Dotted_nameContext *ctx) override {
+  antlrcpp::Any visitDotted_name(EmpiricalParser::Dotted_nameContext *ctx)
+    override {
     // a single name is an identifier
     AST::identifier id(ctx->NAME(0)->getText());
     AST::expr_t e = AST::Id(id);
@@ -436,7 +466,8 @@ class ParseVisitor : public EmpiricalVisitor {
 
   /* flow statements */
 
-  antlrcpp::Any visitReturn_stmt(EmpiricalParser::Return_stmtContext *ctx) override {
+  antlrcpp::Any visitReturn_stmt(EmpiricalParser::Return_stmtContext *ctx)
+    override {
     AST::expr_t e = nullptr;
     if (ctx->expr()) {
       e = visit(ctx->expr());
@@ -446,7 +477,8 @@ class ParseVisitor : public EmpiricalVisitor {
 
   /* declarations */
 
-  antlrcpp::Any visitDecl_stmt(EmpiricalParser::Decl_stmtContext *ctx) override {
+  antlrcpp::Any visitDecl_stmt(EmpiricalParser::Decl_stmtContext *ctx)
+    override {
     AST::decltype_t dt;
     switch (ctx->dt->getType()) {
 #define CASE(TOKEN, TYPE) \
@@ -463,7 +495,8 @@ class ParseVisitor : public EmpiricalVisitor {
 
   /* expressions */
 
-  antlrcpp::Any visitNexpr_list(EmpiricalParser::Nexpr_listContext *ctx) override {
+  antlrcpp::Any visitNexpr_list(EmpiricalParser::Nexpr_listContext *ctx)
+    override {
     std::vector<AST::alias_t> results;
     for (auto n: ctx->nexpr()) {
       results.push_back(visit(n));
@@ -471,7 +504,8 @@ class ParseVisitor : public EmpiricalVisitor {
     return results;
   }
 
-  antlrcpp::Any visitNexpr(EmpiricalParser::NexprContext *ctx) override {
+  antlrcpp::Any visitNexpr(EmpiricalParser::NexprContext *ctx)
+    override {
     AST::expr_t value = visit(ctx->value);
     AST::identifier name;
     if (ctx->name) {
@@ -480,13 +514,15 @@ class ParseVisitor : public EmpiricalVisitor {
     return AST::alias(value, name);
   }
 
-  antlrcpp::Any visitExpr_stmt(EmpiricalParser::Expr_stmtContext *ctx) override {
+  antlrcpp::Any visitExpr_stmt(EmpiricalParser::Expr_stmtContext *ctx)
+    override {
     const auto& exprs = ctx->expr();
     return (exprs.size() == 1) ? AST::Expr(visit(exprs[0]))
                                : AST::Assign(visit(exprs[0]), visit(exprs[1]));
   }
 
-  antlrcpp::Any visitDirection(EmpiricalParser::DirectionContext *ctx) override {
+  antlrcpp::Any visitDirection(EmpiricalParser::DirectionContext *ctx)
+    override {
     AST::direction_t d;
     switch (ctx->dt->getType()) {
 #define CASE(TOKEN, TYPE) \
@@ -501,11 +537,13 @@ class ParseVisitor : public EmpiricalVisitor {
     return d;
   }
 
-  antlrcpp::Any visitJoin_params(EmpiricalParser::Join_paramsContext *ctx) override {
+  antlrcpp::Any visitJoin_params(EmpiricalParser::Join_paramsContext *ctx)
+    override {
     return visitChildren(ctx);
   }
 
-  antlrcpp::Any visitQueryExpr(EmpiricalParser::QueryExprContext *ctx) override {
+  antlrcpp::Any visitQueryExpr(EmpiricalParser::QueryExprContext *ctx)
+    override {
     AST::querytype_t qt;
     switch (ctx->qt->getType()) {
 #define CASE(TOKEN, TYPE) \
@@ -532,13 +570,15 @@ class ParseVisitor : public EmpiricalVisitor {
     return AST::Query(table, qt, cols, by, where);
   }
 
-  antlrcpp::Any visitSortExpr(EmpiricalParser::SortExprContext *ctx) override {
+  antlrcpp::Any visitSortExpr(EmpiricalParser::SortExprContext *ctx)
+    override {
     AST::expr_t table = visit(ctx->table);
     std::vector<AST::alias_t> by = visit(ctx->by);
     return AST::Sort(table, by);
   }
 
-  antlrcpp::Any visitJoinExpr(EmpiricalParser::JoinExprContext *ctx) override {
+  antlrcpp::Any visitJoinExpr(EmpiricalParser::JoinExprContext *ctx)
+    override {
     AST::expr_t left = visit(ctx->left);
     AST::expr_t right = visit(ctx->right);
 
@@ -607,7 +647,8 @@ class ParseVisitor : public EmpiricalVisitor {
     return AST::UnaryOp(op, operand);
   }
 
-  antlrcpp::Any visitBinOpExpr(EmpiricalParser::BinOpExprContext *ctx) override {
+  antlrcpp::Any visitBinOpExpr(EmpiricalParser::BinOpExprContext *ctx)
+    override {
     std::string op = ctx->op->getText();
     AST::expr_t left = visit(ctx->left);
     AST::expr_t right = visit(ctx->right);
@@ -662,8 +703,14 @@ class ParseVisitor : public EmpiricalVisitor {
     return visitChildren(ctx);
   }
 
-  antlrcpp::Any visitParenExpr(EmpiricalParser::ParenExprContext *ctx) override {
+  antlrcpp::Any visitParenExpr(EmpiricalParser::ParenExprContext *ctx)
+    override {
     return AST::Paren(visit(ctx->expr()));
+  }
+
+  antlrcpp::Any visitAnonDataExpr(EmpiricalParser::AnonDataExprContext *ctx)
+    override {
+    return AST::AnonData(visit(ctx->decl_list()));
   }
 
   /* atoms */
@@ -705,7 +752,8 @@ class ParseVisitor : public EmpiricalVisitor {
     return AST::BoolLiteral(true);
   }
 
-  antlrcpp::Any visitFalseAtom(EmpiricalParser::FalseAtomContext *ctx) override {
+  antlrcpp::Any visitFalseAtom(EmpiricalParser::FalseAtomContext *ctx)
+    override {
     return AST::BoolLiteral(false);
   }
 
@@ -731,7 +779,8 @@ class ParseVisitor : public EmpiricalVisitor {
     return visit(ctx->expr());
   }
 
-  antlrcpp::Any visitKeywordArgExpr(EmpiricalParser::KeywordArgExprContext *ctx) override {
+  antlrcpp::Any visitKeywordArgExpr(EmpiricalParser::KeywordArgExprContext
+                                    *ctx) override {
     // TODO save the name; Python uses keywords separately in AST for this
     return visit(ctx->value);
   }
@@ -742,7 +791,8 @@ class ParseVisitor : public EmpiricalVisitor {
     return AST::Index(visit(ctx->expr()));
   }
 
-  antlrcpp::Any visitSliceExpr(EmpiricalParser::SliceExprContext *ctx) override {
+  antlrcpp::Any visitSliceExpr(EmpiricalParser::SliceExprContext *ctx)
+    override {
     AST::expr_t lower = nullptr;
     if (ctx->lower) {
       lower = visit(ctx->lower);
@@ -784,11 +834,13 @@ class ParseVisitor : public EmpiricalVisitor {
 
   /* numbers */
 
-  antlrcpp::Any visitIntNumber(EmpiricalParser::IntNumberContext *ctx) override {
+  antlrcpp::Any visitIntNumber(EmpiricalParser::IntNumberContext *ctx)
+    override {
     return visit(ctx->integer());
   }
 
-  antlrcpp::Any visitFloatNumber(EmpiricalParser::FloatNumberContext *ctx) override {
+  antlrcpp::Any visitFloatNumber(EmpiricalParser::FloatNumberContext *ctx)
+    override {
     return parse_number(ctx->getText(), 0, 0, false);
   }
 
@@ -834,7 +886,8 @@ class ParseVisitor : public EmpiricalVisitor {
 
   /* characters */
 
-  antlrcpp::Any visitCharacter(EmpiricalParser::CharacterContext *ctx) override {
+  antlrcpp::Any visitCharacter(EmpiricalParser::CharacterContext *ctx)
+    override {
     return parse_string(ctx->getText());
   }
 

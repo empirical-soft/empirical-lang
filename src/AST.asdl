@@ -12,7 +12,8 @@ module AST
                      expr? explicit_rettype, string? docstring)
        | GenericDef(stmt original, declaration* args, expr? explicit_rettype)
        | TemplateDef(stmt original, declaration* templates)
-       | DataDef(identifier name, declaration* templates, declaration* body)
+       | DataDef(identifier name, declaration* templates, declaration* body,
+                 expr? single)
        | Return(expr? value)
        | If(expr test, stmt* body, stmt* orelse)
        | While(expr test, stmt* body)
@@ -43,6 +44,7 @@ module AST
        | TemplatedId(expr id, expr* templates)
        | List(expr* values)
        | Paren(expr subexpr)
+       | AnonData(declaration* body)
 
   slice = Slice(expr? lower, expr? upper, expr? step)
         | Index(expr value)
