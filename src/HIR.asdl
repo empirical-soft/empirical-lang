@@ -17,7 +17,7 @@ module HIR
        | TemplateDef(pointer original, declaration* templates,
                      stmt* instantiated)
        | DataDef(identifier name, declaration* templates, declaration* body,
-                 size_t scope)
+                 expr? single, size_t scope)
        | Return(expr? value, expr? comptime_literal)
        | If(expr test, stmt* body, stmt* orelse)
        | While(expr test, stmt* body)
@@ -59,6 +59,7 @@ module HIR
        | TemplatedId(expr id, expr* templates, resolved ref)
        | List(expr* values)
        | Paren(expr subexpr)
+       | AnonData(declaration* body, size_t scope)
        attributes(datatype? type, size_t traits, compmode mode,
                   identifier? name)
 

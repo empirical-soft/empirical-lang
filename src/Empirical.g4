@@ -79,8 +79,8 @@ declaration : name=NAME (':' type=expr)? ('=' value=expr)?;
 
 
 /* data definition */
-datadef : DATA name=NAME ('{' templates=decl_list '}')? ':'
-          body=decl_list END;
+datadef : DATA name=NAME ('{' templates=decl_list '}')?
+          ((':' body=decl_list END) | ('=' single=expr));
 
 
 /* control flow */
@@ -150,6 +150,7 @@ expr : FROM table=expr qt=(SELECT|EXEC) (cols=nexpr_list)?
      | value=atom ('{' templates=arg_list? '}')?
        right=trailer*                                         # AtomExpr
      | '(' expr ')'                                           # ParenExpr
+     | '{' decl_list '}'                                      # AnonDataExpr
      ;
 
 

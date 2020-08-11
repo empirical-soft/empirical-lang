@@ -218,7 +218,7 @@ These are displayed as a table by default.
 
 ```
 
-We can define a type cast if desired.
+We can define a *type cast* if desired.
 
 ```
 >>> func String(p: Person) = p.name + " is " + String(p.age) + " years old"
@@ -254,10 +254,37 @@ User-defined types can accept *templates*.
 
 ```
 
+The above examples are in *statement syntax*. Types can be defined with *expression syntax*.
+
+```
+>>> data I = Int64
+
+>>> var i: I
+
+>>> i = 17
+
+>>> data Person3 = {name: String, age: Int64}
+
+```
+
+Templates and expression syntax can be combined for a *type provider*. This allows for programmatically determining a type.
+
+```
+>>> data Provider{f: String} = compile(f)
+
+>>> let s = "{name: String, age: Int64}"
+
+>>> var obj: Provider{s}
+
+```
+
 We can always recall the type of an expression.
 
 ```
 >>> type_of(x)
+Int64
+
+>>> type_of(i)
 Int64
 
 >>> type_of(x > 7)
@@ -281,6 +308,9 @@ Person
 
 >>> Person2
 <template>
+
+>>> Person3
+<type>
 
 ```
 

@@ -827,7 +827,9 @@ class SemaVisitor : public AST::BaseVisitor {
         body.push_back(d);
       }
       pop_scope();
-      HIR::stmt_t new_node = HIR::DataDef(name, node->templates, body, scope);
+      HIR::expr_t single = nullptr;
+      HIR::stmt_t new_node = HIR::DataDef(name, node->templates, body, single,
+                                          scope);
       ref = HIR::DataRef(new_node);
       store_symbol(name, ref);
     }
@@ -1165,8 +1167,8 @@ class SemaVisitor : public AST::BaseVisitor {
     return node;
   }
 
-  // create an anonymous function name
-  std::string anon_func_name() {
+  // create an anonymous data name
+  std::string anon_data_name() {
     static size_t counter = 0;
     std::ostringstream oss;
     oss << "Anon__" << counter++;
@@ -1654,7 +1656,9 @@ class SemaVisitor : public AST::BaseVisitor {
     // create shell now if we ever have recursive type definitions
     std::vector<HIR::declaration_t> templates;
     std::vector<HIR::declaration_t> body;
-    HIR::stmt_t new_node = HIR::DataDef(node->name, templates, body, 0);
+    HIR::expr_t single = nullptr;
+    HIR::stmt_t new_node = HIR::DataDef(node->name, templates, body, single,
+                                        0);
     HIR::DataDef_t dd = dynamic_cast<HIR::DataDef_t>(new_node);
     HIR::resolved_t ref = HIR::DataRef(new_node);
     // store name in current scope
@@ -1679,16 +1683,33 @@ class SemaVisitor : public AST::BaseVisitor {
     for (AST::declaration_t b: node->body) {
       HIR::declaration_t d = visit(b);
       d->offset = offset++;
+      if (d->type == nullptr) {
+        sema_err_ << "Error: unable to determine type for " << node->name
+                  << "." << d->name << std::endl;
+      }
       body.push_back(d);
+    }
+    // evaluate single expression
+    if (node->single) {
+      single = unoverload(visit(node->single));
+      if (!is_kind_type(single->type)) {
+        sema_err_ << "Error: cannot assign " << node->name << " to a value"
+                  << std::endl;
+      }
     }
     pop_scope();
     // put everything together
     dd->templates = templates;
     dd->body = body;
+    dd->single = single;
     dd->scope = scope;
     if (sema_err_.str().size() != starting_err_length) {
       // remove from scope if an error had occurred
       remove_symbol_ref(node->name, ref);
+    } else if (node->single) {
+      // replace the reference if this was a rename
+      remove_symbol_ref(node->name, ref);
+      store_symbol(node->name, SemaTypeRef(single->type));
     }
     return new_node;
   }
@@ -1827,7 +1848,7 @@ class SemaVisitor : public AST::BaseVisitor {
     HIR::datatype_t by_type = nullptr;
     if (!by.empty()) {
       std::string ts = get_type_string(by);
-      std::string by_name = anon_func_name();
+      std::string by_name = anon_data_name();
       (void) create_datatype(by_name, ts);
       by_type = make_dataframe('!' + by_name);
     }
@@ -1849,7 +1870,7 @@ class SemaVisitor : public AST::BaseVisitor {
     if (!cols.empty()) {
       std::string byts = by.empty() ? "" : get_type_string(by) + ", ";
       std::string ts = byts + get_type_string(cols);
-      std::string type_name = anon_func_name();
+      std::string type_name = anon_data_name();
       (void) create_datatype(type_name, ts);
       type = make_dataframe('!' + type_name);
     } else {
@@ -1907,7 +1928,7 @@ class SemaVisitor : public AST::BaseVisitor {
 
     // type of 'by' items is its own Dataframe
     std::string ts = get_type_string(by);
-    std::string by_name = anon_func_name();
+    std::string by_name = anon_data_name();
     (void) create_datatype(by_name, ts);
     HIR::datatype_t by_type = make_dataframe('!' + by_name);
 
@@ -1959,13 +1980,13 @@ class SemaVisitor : public AST::BaseVisitor {
 
       // type of 'left_on' items is its own Dataframe
       std::string left_ts = get_type_string(left_on);
-      std::string left_name = anon_func_name();
+      std::string left_name = anon_data_name();
       (void) create_datatype(left_name, left_ts);
       left_on_type = make_dataframe('!' + left_name);
 
       // type of 'right_on' items is its own Dataframe
       std::string right_ts = get_type_string(right_on);
-      std::string right_name = anon_func_name();
+      std::string right_name = anon_data_name();
       (void) create_datatype(right_name, right_ts);
       right_on_type = make_dataframe('!' + right_name);
 
@@ -2058,7 +2079,7 @@ class SemaVisitor : public AST::BaseVisitor {
     std::string remaining_ts;
     if (!bad_dfs) {
       remaining_ts = drop_columns(right->type, right_on_type, right_asof_name);
-      std::string remaining_name = anon_func_name();
+      std::string remaining_name = anon_data_name();
       (void) create_datatype(remaining_name, remaining_ts);
       remaining_type = make_dataframe('!' + remaining_name);
     }
@@ -2067,7 +2088,7 @@ class SemaVisitor : public AST::BaseVisitor {
     HIR::datatype_t full_type = nullptr;
     if (!bad_dfs) {
       std::string full_ts = get_type_string(left->type) + ", " + remaining_ts;
-      std::string full_name = anon_func_name();
+      std::string full_name = anon_data_name();
       (void) create_datatype(full_name, full_ts);
       full_type = make_dataframe('!' + full_name);
     }
@@ -2508,6 +2529,25 @@ class SemaVisitor : public AST::BaseVisitor {
     HIR::expr_t subexpr = visit(node->subexpr);
     return HIR::Paren(subexpr, subexpr->type, subexpr->traits, subexpr->mode,
                       subexpr->name);
+  }
+
+  antlrcpp::Any visitAnonData(AST::AnonData_t node) override {
+    // create an anonymous data def
+    std::string name = anon_data_name();
+    std::vector<AST::declaration_t> templates;
+    AST::expr_t single = nullptr;
+    AST::stmt_t named_def = AST::DataDef(name, templates, node->body, single);
+    HIR::stmt_t s = visit(named_def);
+    HIR::DataDef_t new_def = dynamic_cast<HIR::DataDef_t>(s);
+
+    // construct type of expr
+    Scope::Resolveds resolveds = find_symbol(name);
+    HIR::resolved_t ref = resolveds.empty() ? nullptr : resolveds[0];
+    HIR::datatype_t type = HIR::Kind(HIR::UDT(name, ref));
+
+    // put it all together
+    return HIR::AnonData(new_def->body, new_def->scope, type, all_traits,
+                         HIR::compmode_t::kComptime, name);
   }
 
   antlrcpp::Any visitSlice(AST::Slice_t node) override {
