@@ -44,7 +44,7 @@ type_t encode_vvm_type(const std::string& s) {
   // find the type if possible
   auto iter = encoder.find(s);
   if (iter == encoder.end()) {
-    std::string msg = "Unknown builtin type " + s;
+    std::string msg = "Unknown type: " + s;
     throw std::logic_error(msg);
   }
   return iter->second;

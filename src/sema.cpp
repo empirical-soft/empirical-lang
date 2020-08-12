@@ -259,10 +259,6 @@ class SemaVisitor : public AST::BaseVisitor {
         HIR::VVMTypeRef_t ptr = dynamic_cast<HIR::VVMTypeRef_t>(node);
         return HIR::Kind(HIR::VVMType(ptr->t));
       }
-      case HIR::resolved_::ResolvedKind::kCompilerRef: {
-        HIR::CompilerRef_t ptr = dynamic_cast<HIR::CompilerRef_t>(node);
-        return ptr->type;
-      }
       case HIR::resolved_::ResolvedKind::kSemaFuncRef: {
         HIR::SemaFuncRef_t ptr = dynamic_cast<HIR::SemaFuncRef_t>(node);
         return ptr->type;
@@ -310,11 +306,6 @@ class SemaVisitor : public AST::BaseVisitor {
       }
       case HIR::resolved_::ResolvedKind::kVVMTypeRef: {
         return all_traits;
-      }
-      case HIR::resolved_::ResolvedKind::kCompilerRef: {
-        HIR::CompilerRef_t ptr = dynamic_cast<HIR::CompilerRef_t>(node);
-        HIR::FuncType_t ft = dynamic_cast<HIR::FuncType_t>(ptr->type);
-        return ft->traits;
       }
       case HIR::resolved_::ResolvedKind::kSemaFuncRef: {
         HIR::SemaFuncRef_t ptr = dynamic_cast<HIR::SemaFuncRef_t>(node);
@@ -780,19 +771,20 @@ class SemaVisitor : public AST::BaseVisitor {
 
   // find scalar UDT for a Dataframe name (assumes leading '!')
   HIR::DataDef_t get_underlying_udt(const std::string& name) {
+    // find name
     std::string underlying_name = name.substr(1);
     Scope::Resolveds underlying_resolveds = find_symbol(underlying_name);
     if (underlying_resolveds.empty()) {
       return nullptr;
     }
-    HIR::resolved_t underlying_ref = underlying_resolveds[0];
-    if (underlying_ref->resolved_kind !=
-        HIR::resolved_::ResolvedKind::kDataRef) {
-      return nullptr;
+    HIR::resolved_t ref = underlying_resolveds[0];
+
+    // extract UDT
+    HIR::datatype_t type = get_type(ref);
+    if (is_kind_type(type)) {
+      return get_data_def(get_underlying_type(type));
     }
-    HIR::DataRef_t dr = dynamic_cast<HIR::DataRef_t>(underlying_ref);
-    HIR::DataDef_t dd = dynamic_cast<HIR::DataDef_t>(dr->ref);
-    return dd;
+    return nullptr;
   }
 
   // attempt to make Dataframe with the given type name
@@ -1307,19 +1299,16 @@ class SemaVisitor : public AST::BaseVisitor {
     HIR::expr_t a = args[0];
     HIR::datatype_t t = a->type;
     std::string s = to_string(t);
-    // show types for all overloaded functions
+    // no type for overloaded functions
     if (is_overloaded(a)) {
       HIR::OverloadedId_t id = dynamic_cast<HIR::OverloadedId_t>(a);
       if (id->type->datatype_kind ==
           HIR::datatype_::DatatypeKind::kFuncType) {
-        s = "overloaded:";
-        for (HIR::resolved_t ref: id->refs) {
-          s += "\n  " + to_string(get_type(ref));
-        }
+        s = "overloaded";
       }
     }
-    return HIR::TypeOf(a, s, HIR::Kind(t), all_traits,
-                       HIR::compmode_t::kComptime, a->name);
+    return HIR::TypeOf(a, HIR::Kind(t), all_traits,
+                       HIR::compmode_t::kComptime, s);
   }
 
   // traits_of() function
@@ -1408,10 +1397,6 @@ class SemaVisitor : public AST::BaseVisitor {
 
     store_symbol("Type", HIR::SemaTypeRef(HIR::Kind(nullptr)));
 
-    store_symbol("store", HIR::CompilerRef(size_t(CompilerCodes::kStore),
-      HIR::FuncType({nullptr, HIR::VVMType(size_t(VVM::vvm_types::Ss))},
-                    HIR::Void(), io_traits)));
-
 #include <VVM/builtins.h>
   }
 
@@ -1441,20 +1426,6 @@ class SemaVisitor : public AST::BaseVisitor {
 
   antlrcpp::Any visitFunctionDef(AST::FunctionDef_t node) override {
     size_t starting_err_length = sema_err_.str().size();
-    // get explicit return type
-    HIR::expr_t explicit_rettype = nullptr;
-    if (node->explicit_rettype) {
-      explicit_rettype = visit(node->explicit_rettype);
-    }
-    HIR::datatype_t rettype = nullptr;
-    if (explicit_rettype != nullptr) {
-      if (is_kind_type(explicit_rettype->type)) {
-        rettype = get_underlying_type(explicit_rettype->type);
-      } else {
-        sema_err_ << "Error: return type for " << node->name
-                  << " has invalid type" << std::endl;
-      }
-    }
     // evaluate template parameters in a new scope
     size_t outer_scope = current_scope_;
     push_scope();
@@ -1476,6 +1447,20 @@ class SemaVisitor : public AST::BaseVisitor {
       d->traits = all_traits;
       d->mode = HIR::compmode_t::kNormal;
       args.push_back(d);
+    }
+    // get explicit return type
+    HIR::expr_t explicit_rettype = nullptr;
+    if (node->explicit_rettype) {
+      explicit_rettype = visit(node->explicit_rettype);
+    }
+    HIR::datatype_t rettype = nullptr;
+    if (explicit_rettype != nullptr) {
+      if (is_kind_type(explicit_rettype->type)) {
+        rettype = get_underlying_type(explicit_rettype->type);
+      } else {
+        sema_err_ << "Error: return type for " << node->name
+                  << " has invalid type" << std::endl;
+      }
     }
     // create shell now so body can have recursion
     std::vector<HIR::stmt_t> body;
@@ -2514,6 +2499,7 @@ class SemaVisitor : public AST::BaseVisitor {
     // a list of kinds means we have a kind of array
     if (is_kind_type(expected)) {
       type = HIR::Kind(HIR::Array(get_underlying_type(expected)));
+      name = '[' + name + ']';
       if (values.size() >= 2) {
         sema_err_ << "Error: only one type allowed for lists" << std::endl;
       }

@@ -18,6 +18,7 @@
 #include <VVM/utils/timestamp.hpp>
 #include <VVM/utils/conversion.hpp>
 #include <VVM/utils/terminal.hpp>
+#include <VVM/utils/csv_infer.hpp>
 
 #include <csvmonkey/csvmonkey.hpp>
 
@@ -661,10 +662,10 @@ WRAPPER_V_S(count)
         const size_t total_df_rows = len_df(cols, members);
 
         // convert each column to strings and tranpose to rows
+        const char sep = ',';
         std::vector<std::string> rows(total_df_rows + 1);
         for (size_t col = 0; col < cols.size(); col++) {
           // get string of each member
-          // TODO will need to escape the separator
           vvm_types vvm_typee =
             static_cast<vvm_types>(members[col].typee >> 1);
           auto results = stringify(vvm_typee, cols[col], members[col].name,
@@ -672,10 +673,24 @@ WRAPPER_V_S(count)
 
           // append string members to corresponding row
           for (size_t row = 0; row < rows.size(); row++) {
-            if (col > 0) {
-              rows[row] += ',';
+            // quote the string if it contains the separator
+            bool needs_quotes = false;
+            const std::string& str = results[row];
+            for (size_t i = 0; i < str.size(); i++) {
+              if (str[i] == sep) {
+                needs_quotes = true;
+                break;
+              }
             }
-            rows[row] += results[row];
+            // append the string along with the separator
+            if (col > 0) {
+              rows[row] += sep;
+            }
+            if (needs_quotes) {
+              rows[row] += '"' + str + '"';
+            } else {
+              rows[row] += str;
+            }
           }
         }
 
@@ -696,6 +711,16 @@ WRAPPER_V_S(count)
     int64_t& z = get_reference<int64_t>(res);
     z = 0;
     storer(typee >> 2, src, filename);
+  }
+
+  /*** INFER ***/
+
+  // infer operation
+  template<class T, class U>
+  void csv_infer_s(operand_t fn, operand_t res) {
+    T filename = get_value<T>(fn);
+    U& result = get_reference<U>(res);
+    result = '{' + infer_table_from_file(filename) + '}';
   }
 
   /*** ASSIGN ***/

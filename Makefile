@@ -17,5 +17,5 @@ website:
 	./scripts/website.sh
 
 clean:
-	rm -rf build thirdparty/asdl/__pycache__/
+	rm -rf build thirdparty/asdl/__pycache__/ tests/*.csv
 
