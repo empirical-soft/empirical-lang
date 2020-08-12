@@ -1,0 +1,13 @@
+# Verify the store() function; must diff the resulting files from the script
+
+data Person:
+  name: String,
+  age: Int64
+end
+
+let df1 = !Person(["AA", "BB", "CC"], [11, 22, 33])
+store(df1, "store_check1.csv")
+
+let df2 = !Person(["A,A", "BB", "CC"], [11, 22, 33])
+store(df2, "store_check2.csv")
+

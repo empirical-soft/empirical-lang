@@ -22,11 +22,20 @@
 
 #include <docopt/docopt.h>
 
+const std::string empirical_routines =
+R"(
+data Provider{filename: String} = compile(_csv_infer(filename))
+
+func load{T}(filename: String) -> !T = _csv_load(filename, !T)
+
+func store(df, filename: String) = _csv_store(type_of(df), df, filename)
+)";
+
 // global variables from command line; extern these as needed
-bool kDumpAst;
-bool kDumpHir;
-bool kDumpVvm;
-bool kTestingMode;
+bool kDumpAst = false;
+bool kDumpHir = false;
+bool kDumpVvm = false;
+bool kTestingMode = false;
 
 // evaluate Empirical code
 std::string eval(const std::string& text, bool interactive = true) {
@@ -77,6 +86,9 @@ std::string read_multiline() {
 
 // main function is the driver for getting user input and calling eval()
 int main(int argc, char* argv[]) {
+  // setup
+  eval(empirical_routines);
+
   // docopt argument parsing
   const char usage[] =
 R"(Empirical programming language
@@ -119,6 +131,7 @@ Options:
     std::cout << "Copyright (C) 2019--2020 Empirical Software Solutions, LLC"
               << std::endl << std::endl;
     Linenoise ln(argv[0]);
+    // uncomment the below line to work with LLDB
     //ln.disable();
     std::string line;
     while (ln.get_line(line)) {

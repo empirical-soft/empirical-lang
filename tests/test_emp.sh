@@ -4,6 +4,7 @@
 # (Must pass-in path to Empirical)
 
 ret=0
+
 for f in *.emp
 do
   result=$(diff <($1 --test-mode $f) <(grep "##" $f | sed "s/##//"))
@@ -14,5 +15,17 @@ do
     ret=1
   fi
 done
+
+for f in *.csv
+do
+  result=$(diff $f sample_csv/$f)
+  if [[ $? -ne 0 ]]
+  then
+    echo $f
+    echo $result
+    ret=1
+  fi
+done
+
 exit $ret
 

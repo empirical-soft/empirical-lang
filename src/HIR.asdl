@@ -40,7 +40,7 @@ module HIR
        | BinOp(expr left, identifier op, expr right, resolved ref)
        | FunctionCall(expr func, expr* args)
        | TemplateInst(expr value, expr* args, stmt* resolutions)
-       | TypeOf(expr arg, string s)
+       | TypeOf(expr arg)
        | TraitsOf(expr arg, string s)
        | ModeOf(expr arg, string s)
        | Columns(expr arg, string s)
@@ -96,7 +96,6 @@ module HIR
            | ModRef(mod ref)
            | VVMOpRef(size_t opcode, datatype type)
            | VVMTypeRef(size_t t)
-           | CompilerRef(size_t code, datatype type)
            | SemaFuncRef(size_t code, datatype type)
            | SemaTypeRef(datatype type)
 }

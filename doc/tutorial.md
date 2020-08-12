@@ -282,26 +282,26 @@ We can always recall the type of an expression.
 
 ```
 >>> type_of(x)
-Int64
+<type: Int64>
 
 >>> type_of(i)
-Int64
+<type: Int64>
 
 >>> type_of(x > 7)
-Bool
+<type: Bool>
 
 >>> var y: type_of(x)
 
 >>> y = 7
 
 >>> type_of(Int64)
-Kind(Int64)
+<type: Kind(Int64)>
 
 >>> Int64
 <type: Int64>
 
 >>> type_of(p)
-Person
+<type: Person>
 
 >>> Person
 <type: Person>
@@ -310,7 +310,7 @@ Person
 <template>
 
 >>> Person3
-<type>
+<type: Person3>
 
 ```
 
@@ -365,7 +365,7 @@ The type can be recalled.
 
 ```
 >>> type_of(xs)
-[Float64]
+<type: [Float64]>
 
 >>> [Float64]
 <type: [Float64]>
@@ -524,28 +524,25 @@ A function's type information is available as well.
 <generic func>
 
 >>> type_of(add)
-(_, _) -> _
+<type: (_, _) -> _>
 
 >>> add3
 <func: add3>
 
 >>> type_of(add3)
-(Int64, Int64, Int64) -> Int64
+<type: (Int64, Int64, Int64) -> Int64>
 
 >>> (+)
-<func: (+)>
+<func>
 
 >>> type_of(sum)
-overloaded:
-  ([Int64]) -> Int64
-  ([Float64]) -> Float64
-  ([String]) -> String
+<type: overloaded>
 
 >>> inc
 <template>
 
 >>> type_of(inc{1})
-(Int64) -> Int64
+<type: (Int64) -> Int64>
 
 ```
 
@@ -717,7 +714,7 @@ Dataframes are just values. They can be assigned to a variable, for example.
 >>> let prices = load$("prices.csv")
 
 >>> type_of(prices)
-!Provider$prices.csv
+<type: !Provider$prices.csv>
 
 >>> columns(prices)
 symbol: String

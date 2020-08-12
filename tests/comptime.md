@@ -87,7 +87,7 @@ Comptime
 40
 
 >>> type_of(add{Float64})
-(Float64, Float64) -> Float64
+<type: (Float64, Float64) -> Float64>
 
 >>> func double_it{T: Type}(a: T): return a + a end
 

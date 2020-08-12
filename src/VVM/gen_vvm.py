@@ -59,10 +59,6 @@ def _make_opcodes():
       # (Value,Kind,Value)
       ('', 'repr',         '', 3),
       # (Value,Kind)->String
-      ('', 'load',         '', 3),
-      # (String,Kind)->Value
-      ('', 'store',        '', 4),
-      # (Kind,Value,String)->()
       ('', 'where',        '', 4),
       # (Value,[Bool],Kind)->Value
       ('', 'br',           '', 1),
@@ -275,6 +271,11 @@ def _make_opcodes():
         for t in all_types:
             opcodes += [('', k, '([%s],Int64)->%s' % (t, t), v)]
 
+    # operators on CSV files
+    opcodes += [("_csv_load", "load", "(String,Kind)->Value", 3)]
+    opcodes += [("_csv_store", "store", "(Kind,Value,String)->()", 4)]
+    opcodes += [("_csv_infer", "csv_infer", "String->String", 2)]
+
     return opcodes
 
 opcodes = _make_opcodes()
@@ -292,7 +293,7 @@ def get_opcode(func_name, type_sig):
             return get_vvm_type(t[1:-1], 'v')
         return _vvm_types[t] + append
 
-    if len(type_sig) == 0:
+    if len(type_sig) == 0 or 'Kind' in type_sig or 'Value' in type_sig:
         return func_name
     types = type_sig.split('->')
     params = types[0]
@@ -317,7 +318,7 @@ def get_cpp_func(func_name, type_sig):
         typestr = _cpp_types[t] if t != '()' else 'int64_t'
         return (append, typestr)
 
-    if len(type_sig) == 0:
+    if len(type_sig) == 0 or 'Kind' in type_sig or 'Value' in type_sig:
         return func_name
     halves = type_sig.split('->')
     params = halves[0]
@@ -339,7 +340,13 @@ def get_func_type(type_sig):
     def gen_vvm_type(t):
         if t[0] == '[' and t[-1] == ']':
             return 'HIR::Array(%s)' % gen_vvm_type(t[1:-1])
-        return "HIR::VVMType(size_t(VVM::vvm_types::%ss))" % _vvm_types[t]
+        if t in _vvm_types:
+            return "HIR::VVMType(size_t(VVM::vvm_types::%ss))" % _vvm_types[t]
+        elif t == "Kind":
+            return "HIR::Kind(nullptr)"
+        elif t == "()":
+            return "HIR::Void()"
+        return "nullptr"
 
     sigs = type_sig.split('->')
     argtypes = []
@@ -353,7 +360,7 @@ def get_func_type(type_sig):
             argtypes += [gen_vvm_type(p)]
     else:
         rettype = sigs[0]
-    rt = gen_vvm_type(rettype) if rettype != '()' else 'HIR::Void()'
+    rt = gen_vvm_type(rettype)
     return '{%s}, %s' % (', '.join(argtypes), rt)
 
 

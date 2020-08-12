@@ -39,23 +39,48 @@ class CodegenVisitor : public HIR::BaseVisitor {
         HIR::Array_t arr = dynamic_cast<HIR::Array_t>(node);
         return get_vvm_type(arr->type, 'v');
       }
+      case HIR::datatype_::DatatypeKind::kFuncType: {
+        return "<func>";
+      }
+      case HIR::datatype_::DatatypeKind::kTemplateType: {
+        return "<template>";
+      }
+      case HIR::datatype_::DatatypeKind::kKind: {
+        return "<type>";
+      }
+      case HIR::datatype_::DatatypeKind::kVoid: {
+        return "<void>";
+      }
+    }
+  }
+
+  // can this type be shown to VVM
+  bool is_type_vvm_capable(HIR::datatype_t node) {
+    switch (node->datatype_kind) {
       case HIR::datatype_::DatatypeKind::kFuncType:
       case HIR::datatype_::DatatypeKind::kTemplateType:
       case HIR::datatype_::DatatypeKind::kKind:
-      case HIR::datatype_::DatatypeKind::kVoid: {
-        return "?";
-      }
+      case HIR::datatype_::DatatypeKind::kVoid:
+        return false;
+      default:
+        return true;
     }
   }
 
   // convert Empirical's type to VVM's type code
   VVM::type_t get_type_code(HIR::datatype_t node) {
-    return VVM::encode_type(get_vvm_type(node));
+    if (is_type_vvm_capable(node)) {
+      return VVM::encode_type(get_vvm_type(node));
+    }
+    return VVM::type_t(0);
   }
 
   // convert Empirical's type to a VVM operand via type code
   VVM::operand_t get_type_operand(HIR::datatype_t node) {
-    return VVM::encode_operand(get_vvm_type(node));
+    if (is_type_vvm_capable(node)) {
+      return VVM::encode_operand(get_vvm_type(node));
+    }
+    return VVM::operand_t(0);
   }
 
   // map a UDT's scope to a VVM type code
@@ -86,13 +111,25 @@ class CodegenVisitor : public HIR::BaseVisitor {
     return dd->body.size();
   }
 
-  // return whether the type represents a 'kind'
+  // return whether the type represents a func
+  bool is_func_type(HIR::datatype_t node) {
+    return (node != nullptr &&
+            node->datatype_kind == HIR::datatype_::DatatypeKind::kFuncType);
+  }
+
+  // return whether the type represents a template
+  bool is_template_type(HIR::datatype_t node) {
+    return (node != nullptr &&
+      node->datatype_kind == HIR::datatype_::DatatypeKind::kTemplateType);
+  }
+
+  // return whether the type represents a kind
   bool is_kind_type(HIR::datatype_t node) {
     return (node != nullptr &&
             node->datatype_kind == HIR::datatype_::DatatypeKind::kKind);
   }
 
-  // return whether the type represents a 'void'
+  // return whether the type represents a void
   bool is_void_type(HIR::datatype_t node) {
     return (node != nullptr &&
             node->datatype_kind == HIR::datatype_::DatatypeKind::kVoid);
@@ -252,11 +289,23 @@ class CodegenVisitor : public HIR::BaseVisitor {
         auto last_stmt = node->body.back();
         if (last_stmt->stmt_kind == HIR::stmt_::StmtKind::kExpr) {
           HIR::Expr_t e = dynamic_cast<HIR::Expr_t>(last_stmt);
+          std::string name = e->value->name;
           HIR::datatype_t dt = e->value->type;
+          VVM::operand_t repr_value;
           if (!is_void_type(dt)) {
-            VVM::operand_t typee = get_type_operand(dt);
-            VVM::operand_t repr_value = reserve_space();
-            emit(VVM::opcodes::repr, {last_stmt_value, typee, repr_value});
+            if (is_func_type(dt)) {
+              name = std::isalpha(name[0]) ? name : ("(" + name + ")");
+              repr_value = direct_repr("<func: " + name + ">");
+            } else if (is_template_type(dt)) {
+              repr_value = direct_repr("<template: " + name + ">");
+            } else if (is_kind_type(dt)) {
+              repr_value = direct_repr("<type: " + name + ">");
+            } else {
+              // invoke repr
+              repr_value = reserve_space();
+              VVM::operand_t typee = get_type_operand(dt);
+              emit(VVM::opcodes::repr, {last_stmt_value, typee, repr_value});
+            }
             emit(VVM::opcodes::save, {repr_value});
             last_stmt_value = repr_value;
           }
@@ -761,21 +810,6 @@ class CodegenVisitor : public HIR::BaseVisitor {
     // generate based on the kind of reference
     if (ref != nullptr) {
       if (ref->resolved_kind ==
-          HIR::resolved_::ResolvedKind::kCompilerRef) {
-        // handle compiler functions
-        HIR::CompilerRef_t ptr = dynamic_cast<HIR::CompilerRef_t>(ref);
-        CompilerCodes code = CompilerCodes(ptr->code);
-        switch (code) {
-          case CompilerCodes::kStore: {
-            VVM::operand_t typee = get_type_operand(node->args[0]->type);
-            params.insert(params.begin(), typee);
-            result = reserve_space();
-            params.push_back(result);
-            emit(VVM::opcodes::store, params);
-            break;
-          }
-        }
-      } else if (ref->resolved_kind ==
                  HIR::resolved_::ResolvedKind::kVVMOpRef) {
         // inline builtin functions
         HIR::VVMOpRef_t ptr = dynamic_cast<HIR::VVMOpRef_t>(ref);
@@ -847,8 +881,12 @@ class CodegenVisitor : public HIR::BaseVisitor {
   }
 
   antlrcpp::Any visitTypeOf(HIR::TypeOf_t node) override {
-    // we only reach this node if the user requests it via REPL
-    return direct_repr(node->s);
+    // we expect this to be a Kind
+    if (is_kind_type(node->type)) {
+      HIR::Kind_t k = dynamic_cast<HIR::Kind_t>(node->type);
+      return get_type_operand(k->type);
+    }
+    return get_type_operand(node->type);
   }
 
   antlrcpp::Any visitTraitsOf(HIR::TraitsOf_t node) override {
@@ -964,21 +1002,7 @@ class CodegenVisitor : public HIR::BaseVisitor {
   }
 
   antlrcpp::Any visitOverloadedId(HIR::OverloadedId_t node) override {
-    // we only reach this node if the user requests it via REPL
-    switch (node->type->datatype_kind) {
-      case HIR::datatype_::DatatypeKind::kKind: {
-        return direct_repr("<type: " + node->s + ">");
-      }
-      case HIR::datatype_::DatatypeKind::kFuncType: {
-        std::string s =
-          std::isalpha(node->s[0]) ? node->s : ("(" + node->s + ")");
-        return direct_repr("<func: " + s + ">");
-      }
-      default:
-        break;
-    }
-    invalid("OverloadedId on non Kind or FuncType");
-    return 0;
+    return visit(node->refs[0]);
   }
 
   antlrcpp::Any visitTemplatedId(HIR::TemplatedId_t node) override {
@@ -987,9 +1011,11 @@ class CodegenVisitor : public HIR::BaseVisitor {
 
   antlrcpp::Any visitList(HIR::List_t node) override {
     if (is_kind_type(node->type)) {
-      // we only reach this node if the user requests it via REPL
-      return direct_repr("<type: [" + node->name + "]>");
+      // type -- eg., [Int64]
+      HIR::Kind_t k = dynamic_cast<HIR::Kind_t>(node->type);
+      return get_type_operand(k->type);
     } else {
+      // value -- eg., [1, 2, 3]
       VVM::operand_t value = reserve_space();
       VVM::operand_t typee = get_type_operand(node->type);
       emit(VVM::opcodes::alloc, {typee, value});
@@ -1008,8 +1034,11 @@ class CodegenVisitor : public HIR::BaseVisitor {
   }
 
   antlrcpp::Any visitAnonData(HIR::AnonData_t node) override {
-    // we only reach this node if the user requests it via REPL
-    return direct_repr("<anonymous type>");
+    // build the type
+    std::vector<HIR::declaration_t> templates;
+    HIR::stmt_t stmt = HIR::DataDef("", templates, node->body, nullptr,
+                                    node->scope);
+    return visit(HIR::DataRef(stmt));
   }
 
   antlrcpp::Any visitSlice(HIR::Slice_t node) override {
@@ -1035,7 +1064,6 @@ class CodegenVisitor : public HIR::BaseVisitor {
     emit(VVM::opcodes::alloc, {typee, target});
 
     // assign the value
-    // TODO should "move" temporaries and "copy" otherwise
     if (node->comptime_literal != nullptr) {
       VVM::operand_t value = visit(node->comptime_literal);
       emit(VVM::opcodes::assign, {value, typee, target});
@@ -1053,52 +1081,52 @@ class CodegenVisitor : public HIR::BaseVisitor {
   }
 
   antlrcpp::Any visitQuerytype(HIR::querytype_t value) override {
-    nyi("Querytype");
+    invalid("Querytype");
     return 0;
   }
 
   antlrcpp::Any visitDirection(HIR::direction_t value) override {
-    nyi("Direction");
+    invalid("Direction");
     return 0;
   }
 
   antlrcpp::Any visitCompmode(HIR::compmode_t value) override {
-    nyi("Compmode");
+    invalid("Compmode");
     return 0;
   }
 
   antlrcpp::Any visitVVMType(HIR::VVMType_t node) override {
-    nyi("VVMType");
+    invalid("VVMType");
     return 0;
   }
 
   antlrcpp::Any visitUDT(HIR::UDT_t node) override {
-    nyi("UDT");
+    invalid("UDT");
     return 0;
   }
 
   antlrcpp::Any visitArray(HIR::Array_t node) override {
-    nyi("Array");
+    invalid("Array");
     return 0;
   }
 
   antlrcpp::Any visitFuncType(HIR::FuncType_t node) override {
-    nyi("FuncType");
+    invalid("FuncType");
     return 0;
   }
 
   antlrcpp::Any visitTemplateType(HIR::TemplateType_t node) override {
-    nyi("TemplateType");
+    invalid("TemplateType");
     return 0;
   }
 
   antlrcpp::Any visitKind(HIR::Kind_t node) override {
-    nyi("Kind");
+    invalid("Kind");
     return 0;
   }
 
   antlrcpp::Any visitVoid(HIR::Void_t node) override {
-    nyi("Void");
+    invalid("Void");
     return 0;
   }
 
@@ -1132,9 +1160,7 @@ class CodegenVisitor : public HIR::BaseVisitor {
   }
 
   antlrcpp::Any visitDataRef(HIR::DataRef_t node) override {
-    // we only reach this node if the user requests it via REPL
-    HIR::DataDef_t dd = dynamic_cast<HIR::DataDef_t>(node->ref);
-    return direct_repr("<type: " + dd->name + ">");
+    return get_type_operand(HIR::UDT("", node));
   }
 
   antlrcpp::Any visitModRef(HIR::ModRef_t node) override {
@@ -1143,18 +1169,12 @@ class CodegenVisitor : public HIR::BaseVisitor {
   }
 
   antlrcpp::Any visitVVMOpRef(HIR::VVMOpRef_t node) override {
-    nyi("VVMOpRef");
-    return 0;
+    // we only reach this node if the user requests it via REPL
+    return direct_repr("<func>");
   }
 
   antlrcpp::Any visitVVMTypeRef(HIR::VVMTypeRef_t node) override {
-    nyi("VVMTypeRef");
-    return 0;
-  }
-
-  antlrcpp::Any visitCompilerRef(HIR::CompilerRef_t node) override {
-    nyi("CompilerRef");
-    return 0;
+    return get_type_operand(HIR::VVMType(node->t));
   }
 
   antlrcpp::Any visitSemaFuncRef(HIR::SemaFuncRef_t node) override {
@@ -1163,8 +1183,12 @@ class CodegenVisitor : public HIR::BaseVisitor {
   }
 
   antlrcpp::Any visitSemaTypeRef(HIR::SemaTypeRef_t node) override {
-    // we only reach this node if the user requests it via REPL
-    return direct_repr("<type>");
+    // we expect this to be a Kind
+    if (is_kind_type(node->type)) {
+      HIR::Kind_t k = dynamic_cast<HIR::Kind_t>(node->type);
+      return get_type_operand(k->type);
+    }
+    return get_type_operand(node->type);
   }
 
  public:

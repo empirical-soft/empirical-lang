@@ -17,13 +17,6 @@
 
 #include <VVM/vvm.hpp>
 
-// internal compiler functions
-enum class CompilerCodes: size_t {
-  // TODO 'store' is a cheat here; it should use type parameters from VVM
-  // (that, of course, doesn't exist yet)---eventually we'll have 'typeof', etc
-  kStore
-};
-
 // functions to compile Empirical into VVM bytecode
 AST::mod_t parse(const std::string& text, bool interactive, bool dump_ast);
 HIR::mod_t sema(AST::mod_t ast, bool interactive, bool dump_hir);
