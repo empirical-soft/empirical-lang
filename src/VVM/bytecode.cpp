@@ -121,6 +121,9 @@ std::string disassemble(const defined_types_t& dt) {
     results += decode_types(kv.second);
     results += "}\n";
   }
+  if (!results.empty()) {
+    results += '\n';
+  }
   return results;
 }
 
@@ -230,7 +233,8 @@ std::string decode_ptr(tagged_ptr_t ptr) {
     case PtrMask::kFuncDef: {
       FunctionDef* fd = static_cast<FunctionDef*>(p);
       return "def " + fd->name + "(" + decode_types(fd->args) + ") " +
-        decode_type(fd->rettype) + ":\n" + disassemble(fd->body) + "end";
+        decode_type(fd->rettype) + ":\n" + disassemble(fd->body, "  ") +
+        "end\n";
     }
   }
 }
@@ -241,6 +245,9 @@ std::string disassemble(const const_pool_t& cp) {
   for (auto& kv: cp) {
     results += decode_operand(kv.first) + " = " + decode_ptr(kv.second)
             + '\n';
+  }
+  if (!results.empty()) {
+    results += '\n';
   }
   return results;
 }
@@ -268,19 +275,10 @@ size_t encode_opcode(const std::string& op) {
 
 // disassemble a program
 std::string to_string(const Program& program) {
-  std::string result, text;
-  text = disassemble(program.types);
-  if (!text.empty()) {
-    result += text + '\n';
-  }
-  text = disassemble(program.constants);
-  if (!text.empty()) {
-    result += text + '\n';
-  }
-  text = disassemble(program.instructions);
-  if (!text.empty()) {
-    result += text + '\n';
-  }
+  std::string result;
+  result += disassemble(program.types);
+  result += disassemble(program.constants);
+  result += disassemble(program.instructions, "");
   return result;
 }
 
