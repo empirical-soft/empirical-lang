@@ -1103,7 +1103,8 @@ WRAPPER_V_S(count)
   }
 
   // call operation
-  void call(operand_t func, operand_t num_params, const instructions_t& bytecode) {
+  void call(operand_t func, operand_t num_params,
+            const instructions_t& bytecode) {
     FunctionDef& fd = get_reference<FunctionDef>(func);
     int64_t np = get_value<int64_t>(num_params) - 1;
 

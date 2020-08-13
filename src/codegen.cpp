@@ -140,6 +140,9 @@ class CodegenVisitor : public HIR::BaseVisitor {
 
   /* registers */
 
+  // a non-zero tells us that we are in a function
+  size_t function_count_ = 0;
+
   // map a HIR node's address to VVM's register bank
   std::unordered_map<HIR::declaration_t, VVM::operand_t> reg_map_;
   std::unordered_map<HIR::FunctionDef_t, VVM::operand_t> func_map_;
@@ -339,6 +342,7 @@ class CodegenVisitor : public HIR::BaseVisitor {
     last_operands_[local_mask] = 0;
     VVM::instructions_t saved_bytecode = std::move(instructions_);
     VVM::Labeler<> saved_labeler = std::move(labeler_);
+    function_count_++;
     // function arguments get the first set of registers
     for (auto decl: node->args) {
       VVM::operand_t value = reserve_space();
@@ -368,6 +372,7 @@ class CodegenVisitor : public HIR::BaseVisitor {
     last_operands_[local_mask] = saved_last_operand_local;
     instructions_ = std::move(saved_bytecode);
     labeler_ = std::move(saved_labeler);
+    function_count_--;
     return result;
   }
 
@@ -1082,7 +1087,9 @@ class CodegenVisitor : public HIR::BaseVisitor {
     }
 
     // reserve some space
-    VVM::operand_t target = reserve_space();
+    const VVM::OpMask mask =
+      (function_count_ != 0) ? VVM::OpMask::kLocal : VVM::OpMask::kGlobal;
+    VVM::operand_t target = reserve_space(mask);
     reg_map_[node] = target;
     VVM::operand_t typee = get_type_operand(node->type);
     emit(VVM::opcodes::alloc, {typee, target});

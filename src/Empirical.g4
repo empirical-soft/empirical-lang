@@ -111,7 +111,8 @@ dotted_name : NAME ('.' NAME)*;
 
 
 /* flow statements */
-return_stmt : RETURN expr?;
+return_stmt : RETURN (eos | expr);
+// must check eos because ANTLR will ignore the nl when searching for expr
 
 
 /* declarations */
