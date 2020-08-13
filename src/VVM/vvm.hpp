@@ -150,7 +150,8 @@ size_t encode_opcode(const std::string& op);
 std::string to_string(const Program& program);
 
 // defined in disassembler.h
-std::string disassemble(const instructions_t& code);
+std::string disassemble(const instructions_t& code,
+                        const std::string& padding);
 
 // defined in interpret.cpp
 std::string interpret(const Program& program, Mode mode);
