@@ -322,6 +322,11 @@ class CodegenVisitor : public HIR::BaseVisitor {
   }
 
   antlrcpp::Any visitFunctionDef(HIR::FunctionDef_t node) override {
+    // inline functions are not generated
+    if (node->force_inline) {
+      return VVM::operand_t(0);
+    }
+
     VVM::FunctionDef* fd = new VVM::FunctionDef;
     fd->name = node->name;
     // attach everything to a global now so body can have recursion
@@ -771,9 +776,10 @@ class CodegenVisitor : public HIR::BaseVisitor {
     // operator expressions are just syntactic sugar for function calls
     HIR::expr_t id = HIR::Id(node->op, node->ref, nullptr, empty_traits,
                              HIR::compmode_t::kNormal, node->op);
+    std::vector<HIR::stmt_t> inline_stmts;
     HIR::expr_t desugar =
-      HIR::FunctionCall(id, {node->operand}, node->type, node->traits,
-                        node->mode, id->name);
+      HIR::FunctionCall(id, {node->operand}, inline_stmts, node->type,
+                        node->traits, node->mode, id->name);
     return visit(desugar);
   }
 
@@ -781,13 +787,24 @@ class CodegenVisitor : public HIR::BaseVisitor {
     // operator expressions are just syntactic sugar for function calls
     HIR::expr_t id = HIR::Id(node->op, node->ref, nullptr, empty_traits,
                              HIR::compmode_t::kNormal, node->op);
+    std::vector<HIR::stmt_t> inline_stmts;
     HIR::expr_t desugar =
-      HIR::FunctionCall(id, {node->left, node->right}, node->type,
-                        node->traits, node->mode, id->name);
+      HIR::FunctionCall(id, {node->left, node->right}, inline_stmts,
+                        node->type, node->traits, node->mode, id->name);
     return visit(desugar);
   }
 
   antlrcpp::Any visitFunctionCall(HIR::FunctionCall_t node) override {
+    // inline functions are directly evaluated
+    if (!node->inline_stmts.empty()) {
+      VVM::operand_t last_stmt_value;
+      for (auto s: node->inline_stmts) {
+        VVM::operand_t op = visit(s);
+        last_stmt_value = op;
+      }
+      return last_stmt_value;
+    }
+
     VVM::operand_t result = 0;
     std::vector<VVM::operand_t> params;
     for (auto arg: node->args) {
@@ -959,9 +976,10 @@ class CodegenVisitor : public HIR::BaseVisitor {
     HIR::expr_t id = HIR::Id("suffix" + node->suffix, node->ref, nullptr,
                              empty_traits, HIR::compmode_t::kNormal,
                              node->suffix);
+    std::vector<HIR::stmt_t> inline_stmts;
     HIR::expr_t desugar =
-      HIR::FunctionCall(id, {node->literal}, node->type, node->traits,
-                        node->mode, id->name);
+      HIR::FunctionCall(id, {node->literal}, inline_stmts, node->type,
+                        node->traits, node->mode, id->name);
     return visit(desugar);
   }
 
@@ -1057,6 +1075,12 @@ class CodegenVisitor : public HIR::BaseVisitor {
   }
 
   antlrcpp::Any visitDeclaration(HIR::declaration_t node) override {
+    // use comptime literal if it's available
+    if (node->mode == HIR::compmode_t::kComptime &&
+        node->comptime_literal != nullptr) {
+      return VVM::operand_t(0);
+    }
+
     // reserve some space
     VVM::operand_t target = reserve_space();
     reg_map_[node] = target;

@@ -931,6 +931,23 @@ class SemaVisitor : public AST::BaseVisitor {
     }
   }
 
+  // return an Id from a TemplatedId
+  HIR::Id_t construct_id(HIR::expr_t node) {
+    if (node == nullptr) {
+      return nullptr;
+    }
+    if (node->expr_kind == HIR::expr_::ExprKind::kId) {
+      return dynamic_cast<HIR::Id_t>(node);
+    }
+    if (node->expr_kind == HIR::expr_::ExprKind::kTemplatedId) {
+      HIR::TemplatedId_t temp = dynamic_cast<HIR::TemplatedId_t>(node);
+      HIR::expr_t e = HIR::Id(temp->name, temp->ref, temp->type, temp->traits,
+                              temp->mode, temp->name);
+      return dynamic_cast<HIR::Id_t>(e);
+    }
+    return nullptr;
+  }
+
   bool is_generic(HIR::resolved_t node) {
     return (node != nullptr &&
             node->resolved_kind == HIR::resolved_::ResolvedKind::kGenericRef);
@@ -1467,8 +1484,8 @@ class SemaVisitor : public AST::BaseVisitor {
     HIR::expr_t single = nullptr;
     HIR::stmt_t new_node =
       HIR::FunctionDef(node->name, templates, args, body, single,
-                       explicit_rettype, node->docstring, rettype,
-                       empty_traits);
+                       node->force_inline, explicit_rettype, node->docstring,
+                       rettype, empty_traits, inner_scope, node);
     HIR::FunctionDef_t fd = dynamic_cast<HIR::FunctionDef_t>(new_node);
     HIR::resolved_t ref = HIR::FuncRef(new_node);
     // store name in outer scope
@@ -2161,9 +2178,9 @@ class SemaVisitor : public AST::BaseVisitor {
       }
     }
 
-    // instantiate generic function (if no errors occurred so far)
+    // instantiate generic function
+    HIR::Id_t id = construct_id(func);
     if (sema_err_.str().size() == starting_err_length) {
-      HIR::Id_t id = is_id(func) ? dynamic_cast<HIR::Id_t>(func) : nullptr;
       if (id != nullptr && is_generic(id->ref)) {
         // search to see if this already exists
         std::string instantiated_name = id->s + to_string_generics(args);
@@ -2190,6 +2207,53 @@ class SemaVisitor : public AST::BaseVisitor {
         Traits traits = get_traits(ptr);
         HIR::compmode_t mode = get_mode(ptr);
         func = HIR::Id(instantiated_name, ptr, type, traits, mode, id->name);
+        id = dynamic_cast<HIR::Id_t>(func);
+      }
+    }
+
+    // analyze inline function
+    std::vector<HIR::stmt_t> inline_stmts;
+    if (sema_err_.str().size() == starting_err_length) {
+      // the contents of an inline function are constructed from the original
+      AST::FunctionDef_t original = nullptr;
+      size_t scope = 0;
+      if (id != nullptr &&
+          id->ref->resolved_kind == HIR::resolved_::ResolvedKind::kFuncRef) {
+        HIR::FuncRef_t ref = dynamic_cast<HIR::FuncRef_t>(id->ref);
+        HIR::FunctionDef_t def = dynamic_cast<HIR::FunctionDef_t>(ref->ref);
+        if (def->force_inline) {
+          original = reinterpret_cast<AST::FunctionDef_t>(def->original);
+          scope = def->scope;
+        }
+      }
+
+      if (original != nullptr) {
+        // create new declarations
+        std::vector<AST::declaration_t> decls;
+        if (func->expr_kind == HIR::expr_::ExprKind::kTemplatedId) {
+          HIR::TemplatedId_t temp = dynamic_cast<HIR::TemplatedId_t>(func);
+          for (size_t i = 0; i < temp->templates.size(); i++) {
+            if (!is_kind_type(temp->templates[i]->type)) {
+              AST::expr_t e =
+                downgrade(get_comptime_literal(temp->templates[i]));
+              decls.push_back(AST::declaration(original->templates[i]->name,
+                                               nullptr, e));
+            }
+          }
+        }
+        for (size_t i = 0; i < original->args.size(); i++) {
+          decls.push_back(AST::declaration(original->args[i]->name, nullptr,
+                                           node->args[i]));
+        }
+        // evaluate in a new scope built on the original function's scope
+        // (this is to maintain the original template type parameters)
+        size_t old_scope = current_scope_;
+        current_scope_ = scope;
+        push_scope();
+        inline_stmts.push_back(visit(AST::Decl(AST::decltype_t::kLet, decls)));
+        inline_stmts.push_back(visit(AST::Expr(original->single)));
+        pop_scope();
+        current_scope_ = old_scope;
       }
     }
 
@@ -2205,7 +2269,8 @@ class SemaVisitor : public AST::BaseVisitor {
     // wrap everything together
     HIR::datatype_t rettype = get_rettype(func->type);
     std::string name = !args.empty() ? args[0]->name : func->name;
-    return HIR::FunctionCall(func, args, rettype, traits, mode, name);
+    return HIR::FunctionCall(func, args, inline_stmts, rettype, traits, mode,
+                             name);
   }
 
   antlrcpp::Any visitTemplateInst(AST::TemplateInst_t node) override {
