@@ -244,8 +244,10 @@ class ParseVisitor : public EmpiricalVisitor {
     }
 
     AST::expr_t single = nullptr;
+    bool force_inline = false;
     if (ctx->single) {
       single = visit(ctx->single);
+      force_inline = (ctx->op->getText() == "=>");
     }
 
     // this should be prevented by the grammar, but just to be safe
@@ -264,7 +266,8 @@ class ParseVisitor : public EmpiricalVisitor {
     }
 
     AST::stmt_t node = AST::FunctionDef(name, templates, args, body, single,
-                                        explicit_rettype, docstring);
+                                        force_inline, explicit_rettype,
+                                        docstring);
     if (is_generic) {
       node = AST::GenericDef(node, args, explicit_rettype);
     }

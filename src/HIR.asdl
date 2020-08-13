@@ -9,8 +9,9 @@ module HIR
 
   stmt = FunctionDef(identifier name, declaration* templates,
                      declaration* args, stmt* body, expr? single
-                     expr? explicit_rettype, string? docstring,
-                     datatype rettype, size_t traits)
+                     bool force_inline, expr? explicit_rettype,
+                     string? docstring, datatype rettype, size_t traits,
+                     size_t scope, pointer original)
        | GenericDef(pointer original, declaration* args,
                     expr? explicit_rettype, datatype rettype, size_t traits,
                     stmt* instantiated)
@@ -38,7 +39,7 @@ module HIR
               datatype right_remaining_type)
        | UnaryOp(identifier op, expr operand, resolved ref)
        | BinOp(expr left, identifier op, expr right, resolved ref)
-       | FunctionCall(expr func, expr* args)
+       | FunctionCall(expr func, expr* args, stmt* inline_stmts)
        | TemplateInst(expr value, expr* args, stmt* resolutions)
        | TypeOf(expr arg)
        | TraitsOf(expr arg, string s)

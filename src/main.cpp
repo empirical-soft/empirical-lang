@@ -26,9 +26,9 @@ const std::string empirical_routines =
 R"(
 data Provider{filename: String} = compile(_csv_infer(filename))
 
-func load{T}(filename: String) -> !T = _csv_load(filename, !T)
+func load{T}(filename: String) -> !T => _csv_load(filename, !T)
 
-func store(df, filename: String) = _csv_store(type_of(df), df, filename)
+func store(df, filename: String) => _csv_store(type_of(df), df, filename)
 )";
 
 // global variables from command line; extern these as needed
