@@ -1513,8 +1513,7 @@ class SemaVisitor : public AST::BaseVisitor {
     Traits traits = empty_traits;
     auto& retinfos = retinfo_stack_.top();
     if (retinfos.empty()) {
-      sema_err_ << "Error: function " << node->name
-                << " has no return statements" << std::endl;
+      body_rettype = HIR::Void();
     } else {
       body_rettype = retinfos[0].type;
       traits = retinfos[0].traits;

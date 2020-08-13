@@ -1,0 +1,19 @@
+# Tests for global variables
+
+var g = 10
+
+# use the global variable
+func double_print() = print(g + g)
+
+double_print()
+##20
+
+# mask the global variable
+func triple_print(x: Int64):
+  let g = x + x
+  print(g + x)
+end
+
+triple_print(7)
+##21
+
