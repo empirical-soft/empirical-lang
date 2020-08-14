@@ -1,3 +1,5 @@
+# Tests for user-defined datatypes.
+
 data Trade:
   symbol: String,
   price: Float64,
@@ -14,3 +16,4 @@ print(trades.price)
 
 print(trades.size)
 ##[100, 200]
+

@@ -14,9 +14,9 @@ module HIR
                      size_t scope, pointer original)
        | GenericDef(pointer original, declaration* args,
                     expr? explicit_rettype, datatype rettype, size_t traits,
-                    stmt* instantiated)
+                    stmt* instantiated, size_t scope)
        | TemplateDef(pointer original, declaration* templates,
-                     stmt* instantiated)
+                     stmt* instantiated, size_t scope)
        | DataDef(identifier name, declaration* templates, declaration* body,
                  expr? single, size_t scope)
        | Return(expr? value, expr? comptime_literal)

@@ -1,3 +1,5 @@
+# Tests for conditionals.
+
 func color_code(color: String) -> Int64:
   if color == "red":
     return 1
@@ -22,3 +24,4 @@ print(color_code("yellow"))
 
 print(color_code("black"))
 ##6
+

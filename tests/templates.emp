@@ -1,4 +1,4 @@
-# Examples of templates. Enable --dump-vvm to see how everything is generated
+# Tests for templates. Enable --dump-vvm to see generated assembly.
 
 # single value parameter
 func foo{x: Int64}(y: Int64):
@@ -61,4 +61,20 @@ print(x)
 let y = !Person{Int64}(["A", "B"], [13, 27]).age[1]
 print(y)
 ##27
+
+
+# template function references global
+var three = 3
+func triple{x: Int64}(y: Int64):
+  return three * (x + y)
+end
+
+# show that template gets proper global
+func global(i: Int64):
+  var three = 4
+  return triple{10}(i)
+end
+
+print(global(30))
+##120
 

@@ -1,3 +1,5 @@
+# Tests for loops.
+
 var x = 0
 while x < 5:
   print(x)
@@ -8,3 +10,4 @@ end
 ##2
 ##3
 ##4
+

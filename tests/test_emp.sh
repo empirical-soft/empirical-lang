@@ -12,17 +12,19 @@ do
   then
     echo $f
     echo $result
+    echo
     ret=1
   fi
 done
 
-for f in *.csv
+for f in $(cd expected/; ls)
 do
-  result=$(diff $f sample_csv/$f)
+  result=$(diff $f expected/$f 2>&1)
   if [[ $? -ne 0 ]]
   then
     echo $f
     echo $result
+    echo
     ret=1
   fi
 done

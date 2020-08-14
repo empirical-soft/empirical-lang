@@ -1,4 +1,4 @@
-# Tests for generic functions
+# Tests for generic functions. Enable --dump-vvm to see generated assembly.
 
 func foo(a, b):
   return a + b
@@ -17,4 +17,20 @@ print(foo(4.3, 20.1))
 let s = foo("A", "B")
 print(s)
 ##AB
+
+
+# generic function references global
+var three = 3
+func triple(x):
+  return three * x
+end
+
+# show that generic gets proper global
+func baz(i: Int64):
+  var three = 4
+  return triple(i + 1)
+end
+
+print(baz(50))
+##153
 
