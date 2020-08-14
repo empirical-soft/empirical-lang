@@ -400,6 +400,16 @@ class ToStringPrototypeVisitor(EmitVisitor):
     def visitType(self, type, depth=0):
         self.emit("std::string to_string(%s_t node);" % type.name, depth)
 
+class DuplicatePrototypeVisitor(EmitVisitor):
+    """ Emit duplicate() prototypes """
+
+    def visitModule(self, mod):
+        for type in mod.types:
+            self.visit(type)
+
+    def visitType(self, type, depth=0):
+        self.emit("%s_t duplicate(%s_t node);" % (type.name, type.name), depth)
+
 
 class FunctionVisitor(PrototypeVisitor):
     """ Emit constructors """
@@ -416,7 +426,7 @@ class FunctionVisitor(PrototypeVisitor):
 
 
 class ToStringVisitorVisitor(EmitVisitor):
-    """Generate toString visitor"""
+    """Generate to_string() visitor"""
 
     def visitModule(self, mod, depth=0):
         self.emit("class ToStringVisitor : public BaseVisitor {", depth)
@@ -565,6 +575,91 @@ class ToStringFunctionVisitor(EmitVisitor):
         self.emit("", 0)
 
 
+class DuplicateVisitorVisitor(EmitVisitor):
+    """Generate duplicate() visitor"""
+
+    def visitModule(self, mod, depth=0):
+        self.emit("class DuplicateVisitor : public BaseVisitor {", depth)
+        self.emit("""
+    template <class T>
+    T follow(T value) {
+        return value;
+    }
+
+    std::set<void*> already_visited_;
+
+    template <class T>
+    T* follow(T* value) {
+        bool placed = already_visited_.insert(value).second;
+        return (placed && value) ? visit(value).template as<T*>()
+                                 : value;
+    }
+
+    void* follow(void* value) {
+        return value;
+    }
+
+    template <class T>
+    std::vector<T> follow(std::vector<T>& values) {
+        std::vector<T> results;
+        for (auto& value: values) {
+          results.push_back(follow(value));
+        }
+        return results;
+    }
+        """, 0, reflow=False)
+        self.emit("public:", depth)
+        for type in mod.types:
+            self.visit(type, depth + 1)
+        self.emit("};", depth)
+
+    def visitType(self, type, depth):
+        self.visit(type.value, type.name, depth)
+
+    def visitSum(self, sum, name, depth):
+        if is_simple(sum):
+            self.simple_sum(sum, name, depth)
+        else:
+            for c in sum.cons:
+                self.visit(c, sum.attributes, name, depth)
+
+    def simple_sum(self, sum, name, depth):
+        fname = name.title()
+        self.emit("antlrcpp::Any visit%s(%s_t value) override {" % (fname, name), depth)
+        self.emit("return value;", depth + 1)
+        self.emit("}", depth)
+        self.emit("", 0)
+
+    def visitConstructor(self, cons, attrs, sname, depth):
+        self.emit_function(cons.name, cons.name, cons.fields, attrs, depth)
+
+    def visitProduct(self, product, name, depth):
+        self.emit_function(name, name.title(), product.fields, product.attributes, depth)
+
+    def emit_function(self, name, fname, fields, attrs, depth):
+        args = get_args(fields + attrs)
+        self.emit("antlrcpp::Any visit%s(%s_t node) override {" % (fname, name), depth)
+        pstr = ", ".join(["follow(node->%s)" % aname for atype, aname, opt in args])
+        self.emit("return %s(%s);" % (name, pstr), depth + 1)
+        self.emit("}", depth)
+        self.emit("", 0)
+
+
+class DuplicateFunctionVisitor(EmitVisitor):
+    """ Emit duplicate() prototypes """
+
+    def visitModule(self, mod):
+        for type in mod.types:
+            self.visit(type)
+
+    def visitType(self, type, depth=0):
+        self.emit("%s_t duplicate(%s_t node) {" % (type.name, type.name), depth)
+        self.emit("DuplicateVisitor duplicate_visitor;", depth + 1)
+        self.emit("return duplicate_visitor.visit(node);", depth + 1)
+        self.emit("}", depth)
+        self.emit("", 0)
+
+
 class ChainOfVisitors:
     def __init__(self, *visitors):
         self.visitors = visitors
@@ -603,6 +698,7 @@ def main(srcfile, output_header, output_file):
                         InheritanceVisitor(f),
                         PrototypeVisitor(f),
                         ToStringPrototypeVisitor(f),
+                        DuplicatePrototypeVisitor(f),
                         )
     c.visit(mod)
     f.write("}\n")
@@ -617,6 +713,8 @@ def main(srcfile, output_header, output_file):
                         FunctionVisitor(f),
                         ToStringVisitorVisitor(f),
                         ToStringFunctionVisitor(f),
+                        DuplicateVisitorVisitor(f),
+                        DuplicateFunctionVisitor(f),
                        )
     c.visit(mod)
     f.write("}\n")

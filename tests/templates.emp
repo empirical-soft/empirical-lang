@@ -8,11 +8,11 @@ end
 print(foo{7}(8))
 ##15
 
-print(foo{7}(9))
-##16
-
 print(foo{8}(9))
 ##17
+
+print(foo{7}(9))
+##16
 
 # multiple value parameters
 func baz{x: Int64, y: Int64}(z: Int64):
@@ -36,6 +36,9 @@ print(add{Float64}(3.0, 4.0))
 
 print(add{String}("three", "four"))
 ##threefour
+
+print(add{Float64}(3.5, 4.5))
+##8.0
 
 # implied type parameter
 func baz{T}(x: T):

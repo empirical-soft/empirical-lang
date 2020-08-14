@@ -7,11 +7,11 @@ end
 print(foo(4, 6))
 ##10
 
-print(foo(4, 20))
-##24
-
 print(foo(4.3, 20.1))
 ##24.4
+
+print(foo(4, 20))
+##24
 
 # CTFE example
 let s = foo("A", "B")

@@ -2190,11 +2190,12 @@ class SemaVisitor : public AST::BaseVisitor {
         Scope::Resolveds resolveds = find_symbol(instantiated_name);
         // build it
         if (resolveds.empty()) {
-          // extract definition
+          // copy original definition; we will fill it out below
           HIR::GenericRef_t ref = dynamic_cast<HIR::GenericRef_t>(id->ref);
           HIR::GenericDef_t def = dynamic_cast<HIR::GenericDef_t>(ref->ref);
-          AST::FunctionDef_t original =
-            reinterpret_cast<AST::FunctionDef_t>(def->original);
+          AST::stmt_t dupe = AST::duplicate(
+            reinterpret_cast<AST::stmt_t>(def->original));
+          AST::FunctionDef_t original = dynamic_cast<AST::FunctionDef_t>(dupe);
           // use the scope of where the generic was defined to handle globals
           size_t saved_scope = current_scope_;
           current_scope_ = def->scope;
@@ -2204,6 +2205,7 @@ class SemaVisitor : public AST::BaseVisitor {
             store_symbol(name, HIR::SemaTypeRef(HIR::Kind(args[i]->type)));
             original->args[i]->explicit_type = AST::Id(name);
           }
+          // run visitor; func def saves the duplicated AST pointer
           original->name = instantiated_name;
           HIR::stmt_t new_def = visit(original);
           // save the newly created function
@@ -2492,12 +2494,12 @@ class SemaVisitor : public AST::BaseVisitor {
       resolveds = find_symbol(instantiated_name);
       // build it
       if (resolveds.empty()) {
-        // extract definition
+        // copy original definition; we will fill it out below
         HIR::TemplateRef_t ref = dynamic_cast<HIR::TemplateRef_t>(id->ref);
         HIR::TemplateDef_t template_def =
           dynamic_cast<HIR::TemplateDef_t>(ref->ref);
-        AST::stmt_t original =
-          reinterpret_cast<AST::stmt_t>(template_def->original);
+        AST::stmt_t original = AST::duplicate(
+          reinterpret_cast<AST::stmt_t>(template_def->original));
         // use the scope of where the template was defined to handle globals
         size_t saved_scope = current_scope_;
         current_scope_ = template_def->scope;
@@ -2514,7 +2516,7 @@ class SemaVisitor : public AST::BaseVisitor {
             ast_templates[i]->value = downgrade(literals[i]);
           }
         }
-        // run appropriate visitor
+        // run appropriate visitor; func def saves the duplicated AST pointer
         if (original->stmt_kind == AST::stmt_::StmtKind::kFunctionDef) {
           AST::FunctionDef_t func_def =
             dynamic_cast<AST::FunctionDef_t>(original);
