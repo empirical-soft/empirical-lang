@@ -1,4 +1,4 @@
-# Tests for global variables
+# Tests for global variables.
 
 var g = 10
 

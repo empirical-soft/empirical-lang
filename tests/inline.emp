@@ -1,0 +1,45 @@
+# Tests for inline functions. Enable --dump-vvm to see generated assembly.
+
+# generic inline
+func foo(x) => x + 20
+
+print(foo(9))
+##29
+
+print(foo(27))
+##47
+
+
+# templated inline
+func foo2{x: Int64}(y: Int64) => x - y
+
+print(foo2{15}(30))
+##-15
+
+print(foo2{15}(5))
+##10
+
+
+# templated type inline
+func double{T}(x: T) => x + x
+
+print(double{Float64}(3.3))
+##6.6
+
+print(double{String}("A"))
+##AA
+
+
+# inline function references global
+var three = 3
+func triple(x: Int64) => three * x
+
+# show that inline gets proper global
+func baz(i: Int64):
+  var three = 4
+  return triple(i + 1)
+end
+
+print(baz(50))
+##153
+

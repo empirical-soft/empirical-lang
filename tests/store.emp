@@ -1,4 +1,5 @@
-# Verify the store() function; must diff the resulting files from the script
+# Tests for the store() function.
+# Diff the resulting files in test_emp.sh.
 
 data Person:
   name: String,

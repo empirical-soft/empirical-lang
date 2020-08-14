@@ -1,3 +1,5 @@
+# Tests for user-defined functions.
+
 func add(x: Int64, y: Int64): return x + y end
 
 func add3(x: Int64, y: Int64, z: Int64): return add(add(x, y), z) end
@@ -29,3 +31,4 @@ print(factorial(5))
 
 print(power(3, 4))
 ##81
+

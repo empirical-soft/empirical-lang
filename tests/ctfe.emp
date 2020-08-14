@@ -1,5 +1,5 @@
-# These examples are run via compile-time function evaluation.
-# Enable --dump-vvm to see how the comptime literals have been elided.
+# Tests for compile-time function evaluation.
+# Enable --dump-vvm to see generated assembly.
 
 func inc(x: Int64):
   return x + 1
