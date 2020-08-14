@@ -1,33 +1,42 @@
 # Tests for inline functions. Enable --dump-vvm to see generated assembly.
 
 # generic inline
-func foo(x) => x + 20
+func double(x) => x + x
 
-print(foo(9))
-##29
+print(double(9))
+##18
 
-print(foo(27))
-##47
+print(double(5.1))
+##10.2
+
+print(double(27))
+##54
 
 
 # templated inline
-func foo2{x: Int64}(y: Int64) => x - y
+func foo{x: Int64}(y: Int64) => x - y
 
-print(foo2{15}(30))
+print(foo{15}(30))
 ##-15
 
-print(foo2{15}(5))
+print(foo{29}(30))
+##-1
+
+print(foo{15}(5))
 ##10
 
 
 # templated type inline
-func double{T}(x: T) => x + x
+func double2{T}(x: T) => x + x
 
-print(double{Float64}(3.3))
+print(double2{Float64}(3.3))
 ##6.6
 
-print(double{String}("A"))
+print(double2{String}("A"))
 ##AA
+
+print(double2{Float64}(4.2))
+##8.4
 
 
 # inline function references global
