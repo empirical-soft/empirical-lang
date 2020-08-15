@@ -1,0 +1,19 @@
+# Tests for the load() function.
+
+let file1 = "sample_csv/prices.csv"
+let prices = load{Provider{file1}}(file1)
+
+print(sum(prices.close))
+##3109.12
+
+data Listing:
+  symbol: String,
+  exch: String
+end
+
+var file2 = "sample_csv/listings.csv"
+let listings = load{Listing}(file2)
+
+print(listings.exch)
+##["Q", "N", "Q", "N", "Q"]
+

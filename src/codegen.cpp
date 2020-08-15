@@ -140,9 +140,6 @@ class CodegenVisitor : public HIR::BaseVisitor {
 
   /* registers */
 
-  // a non-zero tells us that we are in a function
-  size_t function_count_ = 0;
-
   // map a HIR node's address to VVM's register bank
   std::unordered_map<HIR::declaration_t, VVM::operand_t> reg_map_;
   std::unordered_map<HIR::FunctionDef_t, VVM::operand_t> func_map_;
@@ -342,7 +339,6 @@ class CodegenVisitor : public HIR::BaseVisitor {
     last_operands_[local_mask] = 0;
     VVM::instructions_t saved_bytecode = std::move(instructions_);
     VVM::Labeler<> saved_labeler = std::move(labeler_);
-    function_count_++;
     // function arguments get the first set of registers
     for (auto decl: node->args) {
       VVM::operand_t value = reserve_space();
@@ -372,7 +368,6 @@ class CodegenVisitor : public HIR::BaseVisitor {
     last_operands_[local_mask] = saved_last_operand_local;
     instructions_ = std::move(saved_bytecode);
     labeler_ = std::move(saved_labeler);
-    function_count_--;
     return result;
   }
 
@@ -781,9 +776,8 @@ class CodegenVisitor : public HIR::BaseVisitor {
     // operator expressions are just syntactic sugar for function calls
     HIR::expr_t id = HIR::Id(node->op, node->ref, nullptr, empty_traits,
                              HIR::compmode_t::kNormal, node->op);
-    std::vector<HIR::stmt_t> inline_stmts;
     HIR::expr_t desugar =
-      HIR::FunctionCall(id, {node->operand}, inline_stmts, node->type,
+      HIR::FunctionCall(id, {node->operand}, node->inline_expr, node->type,
                         node->traits, node->mode, id->name);
     return visit(desugar);
   }
@@ -792,22 +786,16 @@ class CodegenVisitor : public HIR::BaseVisitor {
     // operator expressions are just syntactic sugar for function calls
     HIR::expr_t id = HIR::Id(node->op, node->ref, nullptr, empty_traits,
                              HIR::compmode_t::kNormal, node->op);
-    std::vector<HIR::stmt_t> inline_stmts;
     HIR::expr_t desugar =
-      HIR::FunctionCall(id, {node->left, node->right}, inline_stmts,
+      HIR::FunctionCall(id, {node->left, node->right}, node->inline_expr,
                         node->type, node->traits, node->mode, id->name);
     return visit(desugar);
   }
 
   antlrcpp::Any visitFunctionCall(HIR::FunctionCall_t node) override {
     // inline functions are directly evaluated
-    if (!node->inline_stmts.empty()) {
-      VVM::operand_t last_stmt_value;
-      for (auto s: node->inline_stmts) {
-        VVM::operand_t op = visit(s);
-        last_stmt_value = op;
-      }
-      return last_stmt_value;
+    if (node->inline_expr != nullptr) {
+      return visit(node->inline_expr);
     }
 
     VVM::operand_t result = 0;
@@ -981,9 +969,8 @@ class CodegenVisitor : public HIR::BaseVisitor {
     HIR::expr_t id = HIR::Id("suffix" + node->suffix, node->ref, nullptr,
                              empty_traits, HIR::compmode_t::kNormal,
                              node->suffix);
-    std::vector<HIR::stmt_t> inline_stmts;
     HIR::expr_t desugar =
-      HIR::FunctionCall(id, {node->literal}, inline_stmts, node->type,
+      HIR::FunctionCall(id, {node->literal}, node->inline_expr, node->type,
                         node->traits, node->mode, id->name);
     return visit(desugar);
   }
@@ -1087,8 +1074,8 @@ class CodegenVisitor : public HIR::BaseVisitor {
     }
 
     // reserve some space
-    const VVM::OpMask mask =
-      (function_count_ != 0) ? VVM::OpMask::kLocal : VVM::OpMask::kGlobal;
+    const VVM::OpMask mask = node->is_global ? VVM::OpMask::kGlobal
+                                             : VVM::OpMask::kLocal;
     VVM::operand_t target = reserve_space(mask);
     reg_map_[node] = target;
     VVM::operand_t typee = get_type_operand(node->type);
