@@ -814,7 +814,8 @@ class SemaVisitor : public AST::BaseVisitor {
         auto d =
           HIR::declaration(b->name, nullptr, b->value, b->dt,
                            HIR::Array(b->type), empty_traits,
-                           HIR::compmode_t::kNormal, nullptr, b->offset);
+                           HIR::compmode_t::kNormal, nullptr, b->offset,
+                           false);
         store_symbol(b->name, HIR::DeclRef(d));
         body.push_back(d);
       }
@@ -2133,8 +2134,9 @@ class SemaVisitor : public AST::BaseVisitor {
       ref = id->ref;
     }
     HIR::expr_t operand = func_call->args[0];
-    return HIR::UnaryOp(node->op, operand, ref, func_call->type,
-                        func_call->traits, func_call->mode, func_call->name);
+    return HIR::UnaryOp(node->op, operand, func_call->inline_expr, ref,
+                        func_call->type, func_call->traits, func_call->mode,
+                        func_call->name);
   }
 
   antlrcpp::Any visitBinOp(AST::BinOp_t node) override {
@@ -2152,8 +2154,9 @@ class SemaVisitor : public AST::BaseVisitor {
     }
     HIR::expr_t left = func_call->args[0];
     HIR::expr_t right = func_call->args[1];
-    return HIR::BinOp(left, node->op, right, ref, func_call->type,
-                      func_call->traits, func_call->mode, func_call->name);
+    return HIR::BinOp(left, node->op, right, func_call->inline_expr, ref,
+                      func_call->type, func_call->traits, func_call->mode,
+                      func_call->name);
   }
 
   antlrcpp::Any visitFunctionCall(AST::FunctionCall_t node) override {
@@ -2224,7 +2227,7 @@ class SemaVisitor : public AST::BaseVisitor {
     }
 
     // analyze inline function
-    std::vector<HIR::stmt_t> inline_stmts;
+    HIR::expr_t inline_expr = nullptr;
     if (sema_err_.str().size() == starting_err_length) {
       // check to see if this function is to be inlined
       if (id != nullptr &&
@@ -2245,11 +2248,15 @@ class SemaVisitor : public AST::BaseVisitor {
           current_scope_ = saved_scope;
           // fill each argument with caller's value
           for (size_t i = 0; i < args.size(); i++) {
-            new_def->args[i]->value = args[i];
-            new_def->args[i]->comptime_literal = get_comptime_literal(args[i]);
+            HIR::declaration_t func_arg = new_def->args[i];
+            HIR::expr_t call_arg = args[i];
+            func_arg->value = call_arg;
+            func_arg->traits = call_arg->traits;
+            func_arg->mode = call_arg->mode;
+            func_arg->comptime_literal = get_comptime_literal(call_arg);
           }
           // put this together
-          inline_stmts.push_back(HIR::Expr(new_def->single));
+          inline_expr = new_def->single;
         }
       }
     }
@@ -2266,7 +2273,7 @@ class SemaVisitor : public AST::BaseVisitor {
     // wrap everything together
     HIR::datatype_t rettype = get_rettype(func->type);
     std::string name = !args.empty() ? args[0]->name : func->name;
-    return HIR::FunctionCall(func, args, inline_stmts, rettype, traits, mode,
+    return HIR::FunctionCall(func, args, inline_expr, rettype, traits, mode,
                              name);
   }
 
@@ -2374,9 +2381,10 @@ class SemaVisitor : public AST::BaseVisitor {
       ref = id->ref;
     }
     HIR::expr_t literal = func_call->args[0];
-    return HIR::UserDefinedLiteral(literal, node->suffix, ref, func_call->type,
-                                   func_call->traits, func_call->mode,
-                                   func_call->name);
+    return HIR::UserDefinedLiteral(literal, node->suffix,
+                                   func_call->inline_expr, ref,
+                                   func_call->type, func_call->traits,
+                                   func_call->mode, func_call->name);
   }
 
   antlrcpp::Any visitIntegerLiteral(AST::IntegerLiteral_t node) override {
@@ -2691,9 +2699,10 @@ class SemaVisitor : public AST::BaseVisitor {
     }
     // construct reference if no errors occurred so far
     HIR::expr_t comptime_literal = get_comptime_literal(value);
+    bool is_global = (current_scope_ == 0);
     HIR::declaration_t new_node =
       HIR::declaration(node->name, explicit_type, value, HIR::decltype_t::kLet,
-                       type, traits, mode, comptime_literal, 0);
+                       type, traits, mode, comptime_literal, 0, is_global);
     if (sema_err_.str().size() == starting_err_length) {
       if (!store_symbol(node->name, HIR::DeclRef(new_node))) {
         sema_err_ << "Error: symbol " << node->name

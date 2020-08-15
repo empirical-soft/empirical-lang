@@ -37,9 +37,10 @@ module HIR
               alias? left_asof, alias? right_asof, bool strict,
               direction direction, expr? within,
               datatype right_remaining_type)
-       | UnaryOp(identifier op, expr operand, resolved ref)
-       | BinOp(expr left, identifier op, expr right, resolved ref)
-       | FunctionCall(expr func, expr* args, stmt* inline_stmts)
+       | UnaryOp(identifier op, expr operand, expr? inline_expr, resolved ref)
+       | BinOp(expr left, identifier op, expr right, expr? inline_expr,
+               resolved ref)
+       | FunctionCall(expr func, expr* args, expr? inline_expr)
        | TemplateInst(expr value, expr* args, stmt* resolutions)
        | TypeOf(expr arg)
        | TraitsOf(expr arg, string s)
@@ -48,7 +49,8 @@ module HIR
        | Compile(expr arg, stmt* body)
        | Member(expr value, identifier member, resolved ref)
        | Subscript(expr value, slice slice)
-       | UserDefinedLiteral(expr literal, identifier suffix, resolved ref)
+       | UserDefinedLiteral(expr literal, identifier suffix, expr? inline_expr,
+                            resolved ref)
        | IntegerLiteral(int64_t n)
        | FloatingLiteral(double n)
        | BoolLiteral(bool b)
@@ -71,7 +73,7 @@ module HIR
 
   declaration = (identifier name, expr? explicit_type, expr? value,
                  decltype dt, datatype type, size_t traits, compmode mode,
-                 expr? comptime_literal, size_t offset)
+                 expr? comptime_literal, size_t offset, bool is_global)
 
   decltype = Let | Var
 
