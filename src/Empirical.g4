@@ -75,7 +75,7 @@ funcdef     : FUNC name=func_name ('{' templates=decl_list '}')?
               ((':' body=suite END) | (op=('='|'=>') single=expr));
 func_name   : NAME | oper;
 decl_list   : declaration (',' declaration)*;
-declaration : name=NAME (':' type=expr)? ('=' value=expr)?;
+declaration : '$'? name=NAME (':' type=expr)? ('=' value=expr)?;
 
 
 /* data definition */

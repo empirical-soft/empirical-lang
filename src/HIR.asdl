@@ -15,6 +15,9 @@ module HIR
        | GenericDef(pointer original, declaration* args,
                     expr? explicit_rettype, datatype rettype, size_t traits,
                     stmt* instantiated, size_t scope)
+       | MacroDef(pointer original, declaration* args,
+                  expr? explicit_rettype, datatype rettype, size_t traits,
+                  stmt implied_template)
        | TemplateDef(pointer original, declaration* templates,
                      stmt* instantiated, size_t scope)
        | DataDef(identifier name, declaration* templates, declaration* body,
@@ -72,8 +75,9 @@ module HIR
   alias = (expr value, identifier? name)
 
   declaration = (identifier name, expr? explicit_type, expr? value,
-                 decltype dt, datatype type, size_t traits, compmode mode,
-                 expr? comptime_literal, size_t offset, bool is_global)
+                 bool macro_parameter, decltype dt, datatype type,
+                 size_t traits, compmode mode, expr? comptime_literal,
+                 size_t offset, bool is_global)
 
   decltype = Let | Var
 
@@ -94,6 +98,7 @@ module HIR
   resolved = DeclRef(declaration ref)
            | FuncRef(stmt ref)
            | GenericRef(stmt ref)
+           | MacroRef(stmt ref)
            | TemplateRef(stmt ref)
            | DataRef(stmt ref)
            | ModRef(mod ref)

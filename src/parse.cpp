@@ -256,13 +256,28 @@ class ParseVisitor : public EmpiricalVisitor {
                  << std::endl;
     }
 
-    // determine if this was a generic function (no type listed for an arg)
-    bool is_generic = false;
+    // determine if this was a generic function or a macro
+    bool is_generic = false, is_macro = false;
     for (AST::declaration_t a: args) {
       if (a->explicit_type == nullptr) {
         is_generic = true;
-        break;
       }
+      if (a->macro_parameter) {
+        is_macro = true;
+      }
+    }
+
+    if (is_generic && !templates.empty()) {
+      parse_err_ << "Error: cannot currently mix generics with templates"
+                 << std::endl;
+    }
+    if (is_generic && is_macro) {
+      parse_err_ << "Error: cannot currently mix generics with macros"
+                 << std::endl;
+    }
+    if (is_macro && !templates.empty()) {
+      parse_err_ << "Error: cannot currently mix macros with templates"
+                 << std::endl;
     }
 
     AST::stmt_t node = AST::FunctionDef(name, templates, args, body, single,
@@ -273,6 +288,9 @@ class ParseVisitor : public EmpiricalVisitor {
     }
     if (!templates.empty()) {
       node = AST::TemplateDef(node, templates);
+    }
+    if (is_macro) {
+      node = AST::MacroDef(node, args, explicit_rettype);
     }
     return node;
   }
@@ -296,6 +314,7 @@ class ParseVisitor : public EmpiricalVisitor {
 
   antlrcpp::Any visitDeclaration(EmpiricalParser::DeclarationContext *ctx)
     override {
+    bool macro_parameter = (ctx->getText()[0] == '$');
     AST::identifier name(ctx->name->getText());
     AST::expr_t explicit_type = nullptr;
     if (ctx->type) {
@@ -305,7 +324,7 @@ class ParseVisitor : public EmpiricalVisitor {
     if (ctx->value) {
       value = visit(ctx->value);
     }
-    return AST::declaration(name, explicit_type, value);
+    return AST::declaration(name, explicit_type, value, macro_parameter);
   }
 
   /* data definition */

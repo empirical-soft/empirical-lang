@@ -102,9 +102,9 @@ enum class PtrMask: size_t {
 
 // a program is the instructions and directives (constants and types)
 struct Program {
-  VVM::instructions_t  instructions;
-  VVM::const_pool_t    constants;
-  VVM::defined_types_t types;
+  instructions_t  instructions;
+  const_pool_t    constants;
+  defined_types_t types;
 };
 
 /*** miscellaneous ***/
@@ -194,7 +194,7 @@ class Labeler {
          throw std::logic_error(oss.str());
        }
        for (auto& dep: kv.second.dependents) {
-         code[dep] = VVM::encode_operand(resolved, VVM::OpMask::kImmediate);
+         code[dep] = encode_operand(resolved, OpMask::kImmediate);
        }
      }
    }
