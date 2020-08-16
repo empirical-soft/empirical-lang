@@ -170,7 +170,7 @@ atom : NAME       # NameAtom
 
 
 /* trailers */
-trailer : '$'? '(' arg_list? ')'
+trailer : '(' arg_list? ')'
         | '[' subscript ']'
         | '.' NAME;
 

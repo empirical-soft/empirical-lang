@@ -1,6 +1,6 @@
 # Tests for query syntax.
 
-let prices = load$("sample_csv/prices.csv")
+let prices = load("sample_csv/prices.csv")
 
 let df = from prices select mid=(low+high)/2.0 where symbol == "BRK.B"
 

@@ -3,7 +3,7 @@ This is an extension of the regression tests from `doc/tutorial_core.md`.
 ### Preparation
 
 ```
->>> let prices = load$("sample_csv/small_prices.csv")
+>>> let prices = load("sample_csv/small_prices.csv")
 
 ```
 

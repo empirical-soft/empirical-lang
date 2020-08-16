@@ -195,7 +195,7 @@ Normal
 ### Dataframe
 
 ```
->>> let prices = load$("sample_csv/prices.csv")
+>>> let prices = load("sample_csv/prices.csv")
 
 >>> traits_of(prices)
 transform, linear

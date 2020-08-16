@@ -3,7 +3,7 @@ These tests cover error reporting.
 ### Preliminary setup
 
 ```
->>> let prices = load$("sample_csv/prices.csv")
+>>> let prices = load("sample_csv/prices.csv")
 
 >>> var my_int = 0
 
@@ -104,6 +104,12 @@ Error: wrong number of arguments; expected 0 but got 1
 
 >>> add(y, 7)
 Error: macro parameter a requires a comptime literal
+
+>>> func misspelled{x:Int64}(y:int64) = x + y
+
+>>> misspelled{1}(2)
+Error: symbol int64 was not found
+Error: declaration for y has invalid type
 
 ```
 

@@ -56,6 +56,10 @@ class CodegenVisitor : public HIR::BaseVisitor {
 
   // can this type be shown to VVM
   bool is_type_vvm_capable(HIR::datatype_t node) {
+    if (node == nullptr) {
+      return false;
+    }
+
     switch (node->datatype_kind) {
       case HIR::datatype_::DatatypeKind::kFuncType:
       case HIR::datatype_::DatatypeKind::kTemplateType:
@@ -877,31 +881,6 @@ class CodegenVisitor : public HIR::BaseVisitor {
     } else {
       nyi("FunctionCall not on id");
     }
-    return result;
-  }
-
-  antlrcpp::Any visitTemplateInst(HIR::TemplateInst_t node) override {
-    // TODO for now value must be "load"; allow anything in future
-    if (node->value->expr_kind != HIR::expr_::ExprKind::kId) {
-      nyi("TemplateInst on non-Id");
-    }
-    HIR::Id_t ptr = dynamic_cast<HIR::Id_t>(node->value);
-    if (ptr->s != "load") {
-      nyi("TemplateInst on non-load");
-    }
-    // visit args, resolved type, and output
-    VVM::operand_t result = 0;
-    std::vector<VVM::operand_t> params;
-    for (auto arg: node->args) {
-      VVM::operand_t p = visit(arg);
-      params.push_back(p);
-    }
-    // TODO Sema should probably put the Dataframe type in resolved
-    VVM::operand_t type_code = get_type_operand(node->type);
-    params.push_back(type_code);
-    result = reserve_space();
-    params.push_back(result);
-    emit(VVM::opcodes::load, params);
     return result;
   }
 

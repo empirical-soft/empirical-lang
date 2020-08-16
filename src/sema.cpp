@@ -76,9 +76,11 @@ class SemaVisitor : public AST::BaseVisitor {
          arg_mode == HIR::compmode_t::kStream)) {
       mode = HIR::compmode_t::kStream;
     } else if (contains_trait(func_traits, SingleTrait::kPure) &&
-             arg_mode == HIR::compmode_t::kComptime) {
+               arg_mode == HIR::compmode_t::kComptime) {
       mode = HIR::compmode_t::kComptime;
     }
+    // values shouldn't have autostream; that only exists for func
+    traits &= ~Traits(SingleTrait::kAutostream);
   }
 
   // append vector of exprs converted from vector of aliases
@@ -557,13 +559,8 @@ class SemaVisitor : public AST::BaseVisitor {
 
   /* type check */
 
-  // list of return types for each function definition in stack
-  struct RetInfo {
-    HIR::datatype_t type;
-    Traits traits;
-    RetInfo(HIR::datatype_t dt, Traits t): type(dt), traits(t) {}
-  };
-  std::stack<std::vector<RetInfo>> retinfo_stack_;
+  // list of returned expr for each function definition in stack
+  std::stack<std::vector<HIR::expr_t>> retinfo_stack_;
 
   // string-ify a datatype
   std::string to_string(HIR::datatype_t node) {
@@ -1529,7 +1526,7 @@ class SemaVisitor : public AST::BaseVisitor {
     }
     // evaluate body in the inner scope
     current_scope_ = inner_scope;
-    retinfo_stack_.push(std::vector<RetInfo>());
+    retinfo_stack_.push(std::vector<HIR::expr_t>());
     for (AST::stmt_t b: node->body) {
       body.push_back(visit(b));
     }
@@ -1537,29 +1534,29 @@ class SemaVisitor : public AST::BaseVisitor {
     if (node->single) {
       single = visit(node->single);
       body.push_back(HIR::Return(single, get_comptime_literal(single)));
-      HIR::datatype_t dt = single->type;
-      Traits t = single->traits;
-      retinfo_stack_.top().emplace_back(dt, t);
+      retinfo_stack_.top().push_back(single);
     }
     fd->body = body;
     fd->single = single;
     pop_scope();
-    // get body's return type
-    HIR::datatype_t body_rettype = nullptr;
+    // get body's return type and traits
+    HIR::datatype_t body_rettype = HIR::Void();
     Traits traits = empty_traits;
     auto& retinfos = retinfo_stack_.top();
-    if (retinfos.empty()) {
-      body_rettype = HIR::Void();
-    } else {
-      body_rettype = retinfos[0].type;
-      traits = retinfos[0].traits;
+    if (!retinfos.empty()) {
+      body_rettype = retinfos[0]->type;
+      traits = retinfos[0]->traits;
       for (size_t i = 1; i < retinfos.size(); i++) {
-        if (!is_same_type(body_rettype, retinfos[i].type)) {
+        if (!is_same_type(body_rettype, retinfos[i]->type)) {
           sema_err_ << "Error: mismatched return types in function "
                     << node->name << ": " << to_string(body_rettype) << " vs "
-                    << to_string(retinfos[i].type) << std::endl;
+                    << to_string(retinfos[i]->type) << std::endl;
         }
-        traits &= retinfos[i].traits;
+        traits &= retinfos[i]->traits;
+      }
+      // if the returned value is a stream, then the function must stream
+      if (compound_mode(retinfos) == HIR::compmode_t::kStream) {
+        traits |= Traits(SingleTrait::kAutostream);
       }
     }
     retinfo_stack_.pop();
@@ -1822,9 +1819,9 @@ class SemaVisitor : public AST::BaseVisitor {
       sema_err_ << "Error: return statement is not in function body"
                 << std::endl;
     } else {
-      HIR::datatype_t dt = e ? e->type : HIR::Void();
-      Traits t = e ? e->traits : empty_traits;
-      retinfo_stack_.top().emplace_back(dt, t);
+      if (e != nullptr) {
+        retinfo_stack_.top().push_back(e);
+      }
     }
     return HIR::Return(e, get_comptime_literal(e));
   }
@@ -2409,49 +2406,6 @@ class SemaVisitor : public AST::BaseVisitor {
                              name);
   }
 
-  antlrcpp::Any visitTemplateInst(AST::TemplateInst_t node) override {
-    // TODO for now value must be "load"; allow anything in future
-    if (node->value->expr_kind != AST::expr_::ExprKind::kId) {
-      nyi("TemplateInst on non-Id");
-    }
-    AST::Id_t ptr = dynamic_cast<AST::Id_t>(node->value);
-    if (ptr->s != "load") {
-      nyi("TemplateInst on non-load");
-    }
-    // "load" is always streaming IO
-    Traits traits = io_traits | Traits(SingleTrait::kAutostream);
-    HIR::compmode_t mode = HIR::compmode_t::kStream;
-    HIR::expr_t value = HIR::Id("load", nullptr, nullptr, traits,
-                                HIR::compmode_t::kNormal, "load");
-    std::vector<HIR::expr_t> args;
-    for (AST::expr_t e: node->args) {
-      args.push_back(visit(e));
-    }
-    // statically evaluate arguments
-    std::vector<HIR::stmt_t> resolutions;
-    std::string type_name;
-    for (HIR::expr_t e: args) {
-      // ensure arg's type is String and then evaluate via VVM
-      // TODO this needs proper CFTE because variables must be set already
-      // (ie., need '$let' to force compiler to pre-set variables)
-      if (is_string_type(e->type)) {
-        HIR::mod_t mod = HIR::Module({HIR::Expr(e)}, "");
-        VVM::Program program = codegen(mod, VVM::Mode::kComptime, true, false);
-        std::string filename = VVM::interpret(program, VVM::Mode::kComptime);
-        filename = filename.substr(1, filename.size() - 2);  // chop quotes
-        std::string typestr = VVM::infer_table_from_file(filename);
-        type_name = "Provider$" + filename;
-        HIR::stmt_t datatype = create_datatype(type_name, typestr);
-        resolutions.push_back(datatype);
-      } else {
-        sema_err_ << "Error: 'load' expects a String parameter" << std::endl;
-      }
-    }
-    HIR::datatype_t rettype = make_dataframe('!' + type_name);
-    return HIR::TemplateInst(value, args, resolutions, rettype, io_traits,
-                             mode, value->name);
-  }
-
   antlrcpp::Any visitMember(AST::Member_t node) override {
     HIR::expr_t value = visit(node->value);
     size_t scope = get_scope(value->type);
@@ -2672,9 +2626,10 @@ class SemaVisitor : public AST::BaseVisitor {
         // save the newly created item in the original scope
         template_def->instantiated.push_back(new_def);
         resolveds = find_symbol(instantiated_name);
+        HIR::resolved_t new_ref = resolveds.empty() ? nullptr : resolveds[0];
         pop_scope();
         // re-store in template's scope
-        store_symbol(instantiated_name, resolveds[0]);
+        store_symbol(instantiated_name, new_ref);
         current_scope_ = saved_scope;
       }
     }

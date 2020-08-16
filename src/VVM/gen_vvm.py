@@ -513,8 +513,8 @@ class BuiltinsWriter(HeaderWriter):
         for o in opcodes:
             if len(o[0]) != 0:
                 traits = all_traits
-                d = {'load': autostream,
-                     'store': none,
+                d = {'_csv_load': io_traits | autostream,
+                     '_csv_store': none,
                      'print': none,
                      'unique': ca_traits,
                      'filter': ca_traits,
