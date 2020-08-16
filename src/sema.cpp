@@ -238,6 +238,11 @@ class SemaVisitor : public AST::BaseVisitor {
         HIR::GenericDef_t def = dynamic_cast<HIR::GenericDef_t>(ptr->ref);
         return get_type(def);
       }
+      case HIR::resolved_::ResolvedKind::kMacroRef: {
+        HIR::MacroRef_t ptr = dynamic_cast<HIR::MacroRef_t>(node);
+        HIR::MacroDef_t def = dynamic_cast<HIR::MacroDef_t>(ptr->ref);
+        return get_type(def);
+      }
       case HIR::resolved_::ResolvedKind::kTemplateRef: {
         HIR::TemplateRef_t ptr = dynamic_cast<HIR::TemplateRef_t>(node);
         HIR::TemplateDef_t def = dynamic_cast<HIR::TemplateDef_t>(ptr->ref);
@@ -288,6 +293,11 @@ class SemaVisitor : public AST::BaseVisitor {
       case HIR::resolved_::ResolvedKind::kGenericRef: {
         HIR::GenericRef_t ptr = dynamic_cast<HIR::GenericRef_t>(node);
         HIR::GenericDef_t def = dynamic_cast<HIR::GenericDef_t>(ptr->ref);
+        return def->traits;
+      }
+      case HIR::resolved_::ResolvedKind::kMacroRef: {
+        HIR::MacroRef_t ptr = dynamic_cast<HIR::MacroRef_t>(node);
+        HIR::MacroDef_t def = dynamic_cast<HIR::MacroDef_t>(ptr->ref);
         return def->traits;
       }
       case HIR::resolved_::ResolvedKind::kTemplateRef: {
@@ -346,6 +356,17 @@ class SemaVisitor : public AST::BaseVisitor {
 
   // return type from a generic function definition
   HIR::datatype_t get_type(HIR::GenericDef_t node) {
+    std::vector<HIR::datatype_t> argtypes;
+    for (HIR::declaration_t arg: node->args) {
+      argtypes.push_back(arg->type);
+    }
+    HIR::datatype_t rettype = node->rettype;
+    Traits traits = node->traits;
+    return FuncType(argtypes, rettype, traits);
+  }
+
+  // return type from a macro definition
+  HIR::datatype_t get_type(HIR::MacroDef_t node) {
     std::vector<HIR::datatype_t> argtypes;
     for (HIR::declaration_t arg: node->args) {
       argtypes.push_back(arg->type);
@@ -812,7 +833,7 @@ class SemaVisitor : public AST::BaseVisitor {
       size_t scope = current_scope_;
       for (HIR::declaration_t b: node->body) {
         auto d =
-          HIR::declaration(b->name, nullptr, b->value, b->dt,
+          HIR::declaration(b->name, nullptr, b->value, false, b->dt,
                            HIR::Array(b->type), empty_traits,
                            HIR::compmode_t::kNormal, nullptr, b->offset,
                            false);
@@ -887,11 +908,13 @@ class SemaVisitor : public AST::BaseVisitor {
       // overload functions with unique signatures
       case HIR::resolved_::ResolvedKind::kVVMOpRef:
       case HIR::resolved_::ResolvedKind::kFuncRef:
-      case HIR::resolved_::ResolvedKind::kGenericRef: {
+      case HIR::resolved_::ResolvedKind::kGenericRef:
+      case HIR::resolved_::ResolvedKind::kMacroRef: {
         switch (second->resolved_kind) {
           case HIR::resolved_::ResolvedKind::kVVMOpRef:
           case HIR::resolved_::ResolvedKind::kFuncRef:
           case HIR::resolved_::ResolvedKind::kGenericRef:
+          case HIR::resolved_::ResolvedKind::kMacroRef:
             return !is_same_type(get_type(first), get_type(second));
           default:
             return false;
@@ -952,6 +975,11 @@ class SemaVisitor : public AST::BaseVisitor {
   bool is_generic(HIR::resolved_t node) {
     return (node != nullptr &&
             node->resolved_kind == HIR::resolved_::ResolvedKind::kGenericRef);
+  }
+
+  bool is_macro(HIR::resolved_t node) {
+    return (node != nullptr &&
+            node->resolved_kind == HIR::resolved_::ResolvedKind::kMacroRef);
   }
 
   bool is_template(HIR::resolved_t node) {
@@ -1574,6 +1602,17 @@ class SemaVisitor : public AST::BaseVisitor {
     AST::FunctionDef_t fd = dynamic_cast<AST::FunctionDef_t>(node->original);
     std::string name = fd->name;
 
+    // evaluate arguments in new scope
+    push_scope();
+    std::vector<HIR::declaration_t> args;
+    for (AST::declaration_t a: node->args) {
+      HIR::declaration_t d = visit(a);
+      d->traits = all_traits;
+      d->mode = HIR::compmode_t::kNormal;
+      args.push_back(d);
+    }
+    pop_scope();
+
     // get explicit return type
     HIR::expr_t explicit_rettype = nullptr;
     if (node->explicit_rettype) {
@@ -1589,6 +1628,33 @@ class SemaVisitor : public AST::BaseVisitor {
       }
     }
 
+    // until explicit traits are a thing
+    size_t traits = all_traits;
+
+    // construct node
+    std::vector<HIR::stmt_t> instantiated;
+    HIR::stmt_t new_node =
+      HIR::GenericDef(node->original, args, explicit_rettype, rettype, traits,
+                      instantiated, current_scope_);
+    HIR::resolved_t ref = HIR::GenericRef(new_node);
+
+    // store node
+    if (sema_err_.str().size() == starting_err_length) {
+      if (!store_symbol(name, ref)) {
+        sema_err_ << "Error: symbol " << name
+                  << " was already defined" << std::endl;
+      }
+    }
+
+    return new_node;
+  }
+
+  antlrcpp::Any visitMacroDef(AST::MacroDef_t node) override {
+    size_t starting_err_length = sema_err_.str().size();
+    // get name
+    AST::FunctionDef_t fd = dynamic_cast<AST::FunctionDef_t>(node->original);
+    std::string name = fd->name;
+
     // evaluate arguments in new scope
     push_scope();
     std::vector<HIR::declaration_t> args;
@@ -1600,15 +1666,42 @@ class SemaVisitor : public AST::BaseVisitor {
     }
     pop_scope();
 
+    // get explicit return type
+    HIR::expr_t explicit_rettype = nullptr;
+    if (node->explicit_rettype) {
+      explicit_rettype = visit(node->explicit_rettype);
+    }
+    HIR::datatype_t rettype = nullptr;
+    if (explicit_rettype != nullptr) {
+      if (is_kind_type(explicit_rettype->type)) {
+        rettype = get_underlying_type(explicit_rettype->type);
+      } else {
+        sema_err_ << "Error: return type for " << name
+                  << " has invalid type" << std::endl;
+      }
+    }
+
     // until explicit traits are a thing
     size_t traits = all_traits;
 
+    // a macro is really an implied template
+    std::vector<AST::declaration_t> templates, new_args;
+    for (size_t i = 0; i < args.size(); i++) {
+      if (args[i]->macro_parameter) {
+        templates.push_back(node->args[i]);
+      } else {
+        new_args.push_back(node->args[i]);
+      }
+    }
+    fd->name = anon_func_name();
+    fd->args = new_args;
+    HIR::stmt_t implied_template = visit(AST::TemplateDef(fd, templates));
+
     // construct node
-    std::vector<HIR::stmt_t> instantiated;
     HIR::stmt_t new_node =
-      HIR::GenericDef(node->original, args, explicit_rettype, rettype, traits,
-                      instantiated, current_scope_);
-    HIR::resolved_t ref = HIR::GenericRef(new_node);
+      HIR::MacroDef(node->original, args, explicit_rettype, rettype, traits,
+                    implied_template);
+    HIR::resolved_t ref = HIR::MacroRef(new_node);
 
     // store node
     if (sema_err_.str().size() == starting_err_length) {
@@ -1792,6 +1885,10 @@ class SemaVisitor : public AST::BaseVisitor {
       if (dt == HIR::decltype_t::kVar) {
         d->traits = empty_traits;
         d->mode = HIR::compmode_t::kNormal;
+      }
+      if (d->macro_parameter && d->comptime_literal == nullptr) {
+        sema_err_ << "Error: macro parameter " << d->name
+                  << " requires a comptime literal value" << std::endl;
       }
       if (d->type == nullptr) {
         sema_err_ << "Error: unable to determine type for " << d->name
@@ -2184,6 +2281,39 @@ class SemaVisitor : public AST::BaseVisitor {
       }
     }
 
+    // expand macro
+    if (sema_err_.str().size() == starting_err_length) {
+      HIR::Id_t id = construct_id(func);
+      if (id != nullptr && is_macro(id->ref)) {
+        // extract macro and the implied template's name
+        HIR::MacroRef_t ref = dynamic_cast<HIR::MacroRef_t>(id->ref);
+        HIR::MacroDef_t macro = dynamic_cast<HIR::MacroDef_t>(ref->ref);
+        std::string template_name =
+          reinterpret_cast<AST::FunctionDef_t>(macro->original)->name;
+        // separate template args from normal runtime args
+        std::vector<AST::expr_t> templates;
+        std::vector<HIR::expr_t> new_args;
+        for (size_t i = 0; i < macro->args.size(); i++) {
+          if (macro->args[i]->macro_parameter) {
+            AST::expr_t lit = downgrade(get_comptime_literal(args[i]));
+            if (lit == nullptr) {
+              sema_err_ << "Error: macro parameter " << macro->args[i]->name
+                        << " requires a comptime literal" << std::endl;
+            } else {
+              templates.push_back(lit);
+            }
+          } else {
+            new_args.push_back(args[i]);
+          }
+        }
+        // visit implied template
+        if (sema_err_.str().size() == starting_err_length) {
+          func = visit(AST::TemplatedId(AST::Id(template_name), templates));
+          std::swap(args, new_args);
+        }
+      }
+    }
+
     // instantiate generic function
     HIR::Id_t id = construct_id(func);
     if (sema_err_.str().size() == starting_err_length) {
@@ -2262,9 +2392,11 @@ class SemaVisitor : public AST::BaseVisitor {
     }
 
     // try to invoke function now internally
-    HIR::expr_t attempt = attempt_sema_function(func, args);
-    if (attempt != nullptr) {
-      return attempt;
+    if (sema_err_.str().size() == starting_err_length) {
+      HIR::expr_t attempt = attempt_sema_function(func, args);
+      if (attempt != nullptr) {
+        return attempt;
+      }
     }
     // traits and mode
     Traits traits;
@@ -2516,7 +2648,8 @@ class SemaVisitor : public AST::BaseVisitor {
         std::vector<AST::declaration_t> ast_templates(literals.size());
         for (size_t i = 0; i < literals.size(); i++) {
           std::string template_name = template_def->templates[i]->name;
-          ast_templates[i] = AST::declaration(template_name, nullptr, nullptr);
+          ast_templates[i] =
+            AST::declaration(template_name, nullptr, nullptr, true);
           if (is_kind_type(literals[i]->type)) {
             // make the template name a type
             store_symbol(template_name, HIR::SemaTypeRef(literals[i]->type));
@@ -2701,8 +2834,9 @@ class SemaVisitor : public AST::BaseVisitor {
     HIR::expr_t comptime_literal = get_comptime_literal(value);
     bool is_global = (current_scope_ == 0);
     HIR::declaration_t new_node =
-      HIR::declaration(node->name, explicit_type, value, HIR::decltype_t::kLet,
-                       type, traits, mode, comptime_literal, 0, is_global);
+      HIR::declaration(node->name, explicit_type, value, node->macro_parameter,
+                       HIR::decltype_t::kLet, type, traits, mode,
+                       comptime_literal, 0, is_global);
     if (sema_err_.str().size() == starting_err_length) {
       if (!store_symbol(node->name, HIR::DeclRef(new_node))) {
         sema_err_ << "Error: symbol " << node->name

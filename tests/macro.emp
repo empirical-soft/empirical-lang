@@ -1,0 +1,21 @@
+# Tests for macros. Enable --dump-vvm to see generated assembly.
+
+func inc($ x: Int64):
+  return x + 1
+end
+
+print(inc(4))
+##5
+
+print(inc(7))
+##8
+
+
+func add($ x: Int64, y: Int64) => x + y
+
+print(add(4, 6))
+##10
+
+print(add(4, 10))
+##14
+

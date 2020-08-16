@@ -83,8 +83,9 @@ class CodegenVisitor : public HIR::BaseVisitor {
     return VVM::operand_t(0);
   }
 
-  // map a UDT's scope to a VVM type code
+  // map a UDT's scope to a VVM type code; cache previously seen types
   std::unordered_map<size_t, VVM::type_t> type_map_;
+  std::unordered_map<std::string, VVM::type_t> seen_types_;
   VVM::type_t last_type_ = 0;
 
   // return type or make it on demand
@@ -378,6 +379,10 @@ class CodegenVisitor : public HIR::BaseVisitor {
     return VVM::operand_t(0);
   }
 
+  antlrcpp::Any visitMacroDef(HIR::MacroDef_t node) override {
+    return visit(node->implied_template);
+  }
+
   antlrcpp::Any visitTemplateDef(HIR::TemplateDef_t node) override {
     for (HIR::stmt_t i: node->instantiated) {
       visit(i);
@@ -391,16 +396,26 @@ class CodegenVisitor : public HIR::BaseVisitor {
       return VVM::operand_t(0);
     }
     // build the type
-    VVM::type_t typee = reserve_type();
-    type_map_[node->scope] = typee;
-    std::vector<VVM::named_type_t> types;
+    VVM::type_definition_t type_def;
     for (HIR::declaration_t b: node->body) {
       VVM::named_type_t nt;
       nt.typee = get_type_code(b->type);
       nt.name = b->name;
-      types.push_back(nt);
+      type_def.push_back(nt);
     }
-    types_[typee] = types;
+    // check if this has already been made
+    VVM::type_t typee;
+    std::string disassem = VVM::decode_types(type_def);
+    auto iter = seen_types_.find(disassem);
+    if (iter != seen_types_.end()){
+      typee = iter->second;
+    } else {
+      typee = reserve_type();
+      seen_types_[disassem] = typee;
+      types_[typee] = type_def;
+    }
+    // save the type
+    type_map_[node->scope] = typee;
     return typee;
   }
 
@@ -1170,6 +1185,11 @@ class CodegenVisitor : public HIR::BaseVisitor {
   antlrcpp::Any visitGenericRef(HIR::GenericRef_t node) override {
     // we only reach this node if the user requests it via REPL
     return direct_repr("<generic func>");
+  }
+
+  antlrcpp::Any visitMacroRef(HIR::MacroRef_t node) override {
+    // we only reach this node if the user requests it via REPL
+    return direct_repr("<macro>");
   }
 
   antlrcpp::Any visitTemplateRef(HIR::TemplateRef_t node) override {

@@ -88,6 +88,9 @@ Error: type 'void' is not assignable
 >>> var z
 Error: unable to determine type for z
 
+>>> let $ m = y
+Error: macro parameter m requires a comptime literal value
+
 ```
 
 ### Functions
@@ -96,6 +99,11 @@ Error: unable to determine type for z
 >>> x{3}
 Error: type Int64 is not a template
 Error: wrong number of arguments; expected 0 but got 1
+
+>>> func add($ a: Int64, b: Int64) => a + b
+
+>>> add(y, 7)
+Error: macro parameter a requires a comptime literal
 
 ```
 
