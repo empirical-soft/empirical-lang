@@ -33,7 +33,6 @@ module AST
        | UnaryOp(identifier op, expr operand)
        | BinOp(expr left, identifier op, expr right)
        | FunctionCall(expr func, expr* args)
-       | TemplateInst(expr value, expr* args)
        | Member(expr value, identifier member)
        | Subscript(expr value, slice slice)
        | UserDefinedLiteral(expr literal, identifier suffix)

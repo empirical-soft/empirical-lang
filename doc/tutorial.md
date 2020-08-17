@@ -4,7 +4,7 @@ Launch Empirical from the command line to get the REPL.
 
 ```skip
 $ path/to/empirical
-Empirical version 0.4.2
+Empirical version 0.5.6
 Copyright (C) 2019--2020 Empirical Software Solutions, LLC
 
 >>>
@@ -30,24 +30,16 @@ $ path/to/empirical --help
 The REPL has some magic commands that may make development easier. For example, we can time an expression:
 
 ```skip
->>> \t let p = load$("prices.csv")
+>>> \t let p = load("prices.csv")
 
  1ms
 
 ```
 
-We can enter multiline statements (pasting is currently not permitted, unfortunately):
+We can also load an external Empirical file.
 
 ```skip
->>> \multiline
-# Entering multiline mode (Ctrl-D to exit)
-func add(x: Int64, y: Int64):
-  return x + y
-end
-^D
-
->>> add(2, 3)
-5
+>>> \l my_code.emp
 
 ```
 
@@ -141,7 +133,7 @@ All values have a type, resolved at compile time.
 
 ```
 
-The static typing is strict and prevents common errors.
+The type system is *static* and *strict*; this prevents common errors.
 
 ```
 >>> x + 1.0
@@ -184,7 +176,7 @@ Error: unable to match overloaded function /
 
 ```
 
-If a cast is invalid, then we will have a `nil` (integers) or `nan` (floating point). The "missing data" value is propagated by operators.
+If a cast is invalid, then we will have a `nil` (integers) or `nan` (floating point). The *missing data* value is propagated by operators.
 
 ```
 >>> Int64("12b") / 2
@@ -407,26 +399,6 @@ The argument types are determined from the caller, but can be listed explicitly.
 
 ```
 
-The return type is inferred, but may be listed explicitly.
-
-```
->>> func add3(x: Int64, y: Int64, z: Int64) -> Int64: return add2(add2(x, y), z) end
-
->>> add3(4, 5, 6)
-15
-
-```
-
-Functions can, of course, be recursive.
-
-```
->>> func fac(x: Int64): if x == 0: return 1 else: return x * fac(x - 1) end end
-
->>> fac(5)
-120
-
-```
-
 Functions can be overloaded by parameter type.
 
 ```
@@ -449,32 +421,6 @@ Error: unable to match overloaded function add2
     argument type at position 0 does not match: Float64 vs Int64
   candidate: (Bool, Bool) -> Bool
     argument type at position 0 does not match: Float64 vs Bool
-
-```
-
-Functions can take templates of course.
-
-```
->>> func mult2{T}(x: T, y: T) = x * y
-
->>> mult2{Int64}(4, 6)
-24
-
->>> mult2{Float64}(4.0, 6.0)
-24.0
-
-```
-
-The template parameter is a `Type` by default, but value parameters are also permitted.
-
-```
->>> func inc{i: Int64}(x: Int64) = x + i
-
->>> inc{1}(7)
-8
-
->>> inc{10}(7)
-17
 
 ```
 
@@ -517,6 +463,94 @@ User-defined literals can be defined by prepending `suffix` to any function name
 
 ```
 
+The return type is also inferred, but may be listed explicitly.
+
+```
+>>> func add3(x: Int64, y: Int64, z: Int64) -> Int64: return add2(add2(x, y), z) end
+
+>>> add3(4, 5, 6)
+15
+
+```
+
+Functions can, of course, be recursive.
+
+```
+>>> func fac(x: Int64): if x == 0: return 1 else: return x * fac(x - 1) end end
+
+>>> fac(5)
+120
+
+```
+
+### Metaprogramming
+
+Functions can take templates.
+
+```
+>>> func mult2{T}(x: T, y: T) = x * y
+
+>>> mult2{Int64}(4, 6)
+24
+
+>>> mult2{Float64}(4.0, 6.0)
+24.0
+
+```
+
+The template parameter is a `Type` by default, but value parameters are also permitted.
+
+```
+>>> func inc{i: Int64}(x: Int64) = x + i
+
+>>> inc{1}(7)
+8
+
+>>> inc{10}(7)
+17
+
+```
+
+A macro is possible by prepending a dollar sign to a parameter name. As with templates, the caller must provide a *comptime literal* (a simple value, such as a `String` or `Int64`, that can be derived at compile time).
+
+```
+>>> func inc2($ i: Int64, x: Int64) = x + i
+
+>>> inc2(7, 8)
+15
+
+```
+
+Empirical's *compile-time function evaluation* (CTFE) will automatically determine the result of an expression ahead of time if possible.
+
+```
+>>> let v = 100 - 88
+
+>>> inc2(v / 3, 21)
+25
+
+```
+
+A mutable variable is not permitted in CTFE because its value can change. (IO-derived values are also prohibited because their results cannot be determined at compile time.)
+
+```
+>>> var u = 100
+
+>>> inc2(u, 50)
+Error: macro parameter i requires a comptime literal
+
+```
+
+A function can be inlined, meaning that the function body is pasted into the caller's location. This can speed-up small expressions.
+
+```
+>>> func triple(x: Int64) => x + x + x
+
+>>> triple(7)
+21
+
+```
+
 A function's type information is available as well.
 
 ```
@@ -540,6 +574,9 @@ A function's type information is available as well.
 
 >>> inc
 <template>
+
+>>> inc2
+<macro>
 
 >>> type_of(inc{1})
 <type: (Int64) -> Int64>
@@ -682,7 +719,7 @@ Timestamp(nil)
 Statically-typed Dataframes (tables) are the primary unique feature of Empirical. If the input source is available at compile time, then the types can be inferred automatically.
 
 ```
->>> load$("prices.csv")
+>>> load("prices.csv")
  symbol       date   open   high    low  close   volume
    AAPL 2017-01-03 115.80 116.33 114.76 116.15 28781865
    AAPL 2017-01-04 115.85 116.51 115.75 116.02 21118116
@@ -711,10 +748,7 @@ Statically-typed Dataframes (tables) are the primary unique feature of Empirical
 Dataframes are just values. They can be assigned to a variable, for example.
 
 ```
->>> let prices = load$("prices.csv")
-
->>> type_of(prices)
-<type: !Provider$prices.csv>
+>>> let prices = load("prices.csv")
 
 >>> columns(prices)
 symbol: String
@@ -785,7 +819,7 @@ Dataframe columns are simply arrays.
 We can call functions on columns.
 
 ```
->>> func mid(xs: [Float64], ys: [Float64]): return (xs + ys) / 2.0 end
+>>> func mid(xs, ys) = (xs + ys) / 2.0
 
 >>> from prices select symbol, date, midpoint = mid(low, high)
  symbol       date midpoint

@@ -44,7 +44,6 @@ module HIR
        | BinOp(expr left, identifier op, expr right, expr? inline_expr,
                resolved ref)
        | FunctionCall(expr func, expr* args, expr? inline_expr)
-       | TemplateInst(expr value, expr* args, stmt* resolutions)
        | TypeOf(expr arg)
        | TraitsOf(expr arg, string s)
        | ModeOf(expr arg, string s)

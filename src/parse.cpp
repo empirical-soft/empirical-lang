@@ -696,11 +696,7 @@ class ParseVisitor : public EmpiricalVisitor {
     for (auto trailer: ctx->trailer()) {
       if (trailer->arg_list()) {
         std::vector<AST::expr_t> args = visit(trailer->arg_list());
-        if (trailer->getText()[0] == '$') {
-          e = AST::TemplateInst(e, args);
-        } else {
-          e = AST::FunctionCall(e, args);
-        }
+        e = AST::FunctionCall(e, args);
       } else if (trailer->subscript()) {
         AST::slice_t slice = visit(trailer->subscript());
         e = AST::Subscript(e, slice);
@@ -708,13 +704,9 @@ class ParseVisitor : public EmpiricalVisitor {
         AST::identifier name(trailer->NAME()->getText());
         e = AST::Member(e, name);
       } else {
-        // empty template instantiation or function call
+        // empty function call
         std::vector<AST::expr_t> args;
-        if (trailer->getText()[0] == '$') {
-          e = AST::TemplateInst(e, args);
-        } else {
-          e = AST::FunctionCall(e, args);
-        }
+        e = AST::FunctionCall(e, args);
       }
     }
 

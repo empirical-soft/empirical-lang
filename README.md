@@ -14,7 +14,7 @@
 Read CSV files and infer their types (at compile time!):
 
 ```
->>> let trades = load$("trades.csv"), quotes = load$("quotes.csv")
+>>> let trades = load("trades.csv"), quotes = load("quotes.csv")
 ```
 
 Compute a one-minute volume-weighted average price (VWAP):

@@ -24,9 +24,11 @@
 
 const std::string empirical_routines =
 R"(
-data Provider{filename: String} = compile(_csv_infer(filename))
+data CsvProvider{filename: String} = compile(_csv_infer(filename))
 
-func load{T}(filename: String) -> !T => _csv_load(filename, !T)
+func csv_load{T}(filename: String) -> !T => _csv_load(filename, !T)
+
+func load($ filename: String) => csv_load{CsvProvider{filename}}(filename)
 
 func store(df, filename: String) => _csv_store(type_of(df), df, filename)
 )";
