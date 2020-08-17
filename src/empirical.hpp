@@ -23,3 +23,6 @@ HIR::mod_t sema(AST::mod_t ast, bool interactive, bool dump_hir);
 VVM::Program codegen(HIR::mod_t hir, VVM::Mode vvm_mode, bool interactive,
                      bool dump_vvm);
 
+// convert C++ argv into Empirical argv
+void set_argv(const std::vector<std::string>& argv);
+
