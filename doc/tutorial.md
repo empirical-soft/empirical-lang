@@ -136,50 +136,31 @@ All values have a type, resolved at compile time.
 The type system is *static* and *strict*; this prevents common errors.
 
 ```
->>> x + 1.0
+>>> x + "5"
 Error: unable to match overloaded function +
   candidate: (Int64, Int64) -> Int64
-    argument type at position 1 does not match: Float64 vs Int64
+    argument type at position 1 does not match: String vs Int64
   candidate: (Float64, Float64) -> Float64
     argument type at position 0 does not match: Int64 vs Float64
-  candidate: (Int64, [Int64]) -> [Int64]
-    argument type at position 1 does not match: Float64 vs [Int64]
+  candidate: (Int64, Float64) -> Float64
+    argument type at position 1 does not match: String vs Float64
   ...
-  <45 others>
+  <53 others>
 
 ```
 
 A value can be cast to a desired type.
 
 ```
->>> Float64(x) + 1.0
-38.0
-
-```
-
-This kind of explicit typing makes code less error prone.
-
-```
->>> "12" / 2
-Error: unable to match overloaded function /
-  candidate: (Int64, Int64) -> Int64
-    argument type at position 0 does not match: String vs Int64
-  candidate: (Float64, Float64) -> Float64
-    argument type at position 0 does not match: String vs Float64
-  candidate: (Int64, [Int64]) -> [Int64]
-    argument type at position 0 does not match: String vs Int64
-  ...
-  <21 others>
-
->>> Int64("12") / 2
-6
+>>> x + Int64("5")
+42
 
 ```
 
 If a cast is invalid, then we will have a `nil` (integers) or `nan` (floating point). The *missing data* value is propagated by operators.
 
 ```
->>> Int64("12b") / 2
+>>> x + Int64("5b")
 nil
 
 ```
