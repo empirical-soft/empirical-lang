@@ -1151,3 +1151,50 @@ We can join both `on` an exact key and `asof` a time.
    EBAY 2017-01-11  30.30  30.42  30.01  30.41  8168999      Q2
 
 ```
+
+## Scripting
+
+Empirical scripts get command-line arguments as `argv`. Since the argument values are not known at compile time, and because Empirical is a statically typed language, users cannot call `load()`. Instead, users must supply an explicit type to the templated function `csv_load{}()`. (Fortunately, the type definition can be seen in the REPL ahead-of-time with `columns()`.) Results can be saved with `store()`.
+
+
+```skip
+$ cat aggregate.emp
+#!path/to/empirical
+
+# single price row
+data Price:
+  symbol: String,
+  date: Date,
+  open: Float64,
+  high: Float64,
+  low: Float64,
+  close: Float64,
+  volume: Int64
+end
+
+# argv[0] is the script name
+if len(argv) != 2:
+  print("Missing path to CSV file")
+  exit(1)
+end
+
+# aggregate volumes from the price file
+let prices = csv_load{Price}(argv[1])
+let v = from prices select sum(volume) by symbol
+store(v, "volumes.csv")
+```
+
+If execute privileges are given to the script (`chmod a+x`), then simply run the script on the command line.
+
+```skip
+$ ./aggregate.emp
+Missing path to CSV file
+
+$ ./aggregate.emp prices.csv
+
+$ cat volumes.csv
+symbol,volume
+AAPL,277096071
+BRK.B,33905036
+EBAY,95312664
+```

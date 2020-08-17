@@ -2853,3 +2853,25 @@ HIR::mod_t sema(AST::mod_t ast, bool interactive, bool dump_hir) {
   return hir;
 }
 
+// convert C++ argv into Empirical argv
+void set_argv(const std::vector<std::string>& argv) {
+  // construct an AST from the arguments
+  AST::declaration_t d;
+  if (argv.empty()) {
+    d = AST::declaration("argv", AST::List({AST::Id("String")}), nullptr,
+                         false);
+  } else {
+    std::vector<AST::expr_t> items;
+    for (auto& a: argv) {
+      items.push_back(AST::Str(a));
+    }
+    d = AST::declaration("argv", nullptr, AST::List(items), false);
+  }
+  AST::mod_t ast = AST::Module({AST::Decl(AST::decltype_t::kVar, {d})}, "");
+
+  // evaluate the AST
+  HIR::mod_t hir = sema(ast, false, false);
+  VVM::Program program = codegen(hir, VVM::Mode::kRuntime, false, false);
+  VVM::interpret(program, VVM::Mode::kRuntime);
+}
+

@@ -934,6 +934,15 @@ WRAPPER_V_S(count)
 
   /*** MISC ***/
 
+  // exit operation
+  template<class T, class U>
+  void _exit_s(operand_t op1, operand_t op2) {
+    T n = get_value<T>(op1);
+    throw ExitException(n);
+    U& throw_away = get_reference<U>(op2);
+    throw_away = U(0);
+  }
+
   // write operation
   void write(operand_t op) {
     std::string& x = get_reference<std::string>(op);

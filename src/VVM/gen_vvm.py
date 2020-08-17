@@ -98,6 +98,7 @@ def _make_opcodes():
     ]
 
     opcodes += [('now', 'now', 'Timestamp', 1)]
+    opcodes += [('exit', '_exit', 'Int64->()', 2)]
 
     # casting operators
     pairs = [(string_types, all_types),

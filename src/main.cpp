@@ -96,7 +96,7 @@ int main(int argc, char* argv[]) {
 R"(Empirical programming language
 
 Usage:
-  empirical [--dump-ast] [--dump-hir] [--dump-vvm] [--test-mode] [<file>]
+  empirical [--dump-ast] [--dump-hir] [--dump-vvm] [--test-mode] [<file> [<args> ...]]
   empirical --verify-markdown <file>
   empirical -v | --version
   empirical -h | --help
@@ -125,6 +125,12 @@ Options:
   std::string md_file = args["--verify-markdown"] ?
                         args["--verify-markdown"].asString() : "";
   std::string filename = args["<file>"] ? args["<file>"].asString() : "";
+
+  std::vector<std::string> cli_args = args["<args>"].asStringList();
+  if (!filename.empty()) {
+    cli_args.insert(cli_args.begin(), filename);
+  }
+  set_argv(cli_args);
 
   int ret_code = 0;
   if (filename.empty() && md_file.empty()) {
@@ -203,6 +209,9 @@ Options:
         catch (std::exception& e) {
           std::cerr << e.what() << std::endl;
         }
+        catch (VVM::ExitException& e) {
+          std::cerr << "To exit: use 'exit', 'quit', or Ctrl-D" << std::endl;
+        }
       } else {
         std::cout << std::endl;
       }
@@ -229,6 +238,9 @@ Options:
       catch (std::exception& e) {
         result = std::string(e.what()) + '\n';
       }
+      catch (VVM::ExitException& e) {
+        result = "To exit: use 'exit', 'quit', or Ctrl-D\n";
+      }
 
       if (result != t.out) {
         std::cout << ">>> " << t.in;
@@ -251,6 +263,9 @@ Options:
     catch (std::exception& e) {
       std::cerr << e.what() << std::endl;
       return 1;
+    }
+    catch (VVM::ExitException& e) {
+      return e.n;
     }
   }
   return ret_code;

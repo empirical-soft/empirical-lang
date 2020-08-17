@@ -120,6 +120,13 @@ enum class Mode: size_t {
   kComptime
 };
 
+/*** exceptions ***/
+
+struct ExitException {
+  int64_t n;
+  explicit ExitException(int64_t n_): n(n_) {}
+};
+
 /*** forward declarations (most defined in bytecode.cpp) ***/
 
 type_definition_t get_type_members(type_t typee, const defined_types_t& types);
