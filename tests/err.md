@@ -37,16 +37,16 @@ Error: unable to parse
 ### Type errors
 
 ```
->>> 1 + 2.
+>>> 1 + "2"
 Error: unable to match overloaded function +
   candidate: (Int64, Int64) -> Int64
-    argument type at position 1 does not match: Float64 vs Int64
+    argument type at position 1 does not match: String vs Int64
   candidate: (Float64, Float64) -> Float64
     argument type at position 0 does not match: Int64 vs Float64
-  candidate: (Int64, [Int64]) -> [Int64]
-    argument type at position 1 does not match: Float64 vs [Int64]
+  candidate: (Int64, Float64) -> Float64
+    argument type at position 1 does not match: String vs Float64
   ...
-  <45 others>
+  <53 others>
 
 >>> my_int = 7.
 Error: mismatched types in assignment: Int64 vs Float64

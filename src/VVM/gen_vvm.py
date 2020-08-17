@@ -151,6 +151,10 @@ def _make_opcodes():
         for p in patterns:
             for t in arithmetic_types:
                 opcodes += [(v, k, p % (t, t, t), 3)]
+            for ti in integer_types:
+                for tf in float_types:
+                    opcodes += [(v, k, p % (ti, tf, tf), 3)]
+                    opcodes += [(v, k, p % (tf, ti, tf), 3)]
 
     # binary operators -- comparison
     operators = [('lt', '<'), ('gt', '>'), ('eq', '=='), ('ne', '!='),
