@@ -823,63 +823,58 @@ class CodegenVisitor : public HIR::BaseVisitor {
       VVM::operand_t p = visit(arg);
       params.push_back(p);
     }
-    // get the reference and type
+    // get the type and reference
+    HIR::expr_t func = node->func;
+    HIR::datatype_t type = func->type;
     HIR::resolved_t ref = nullptr;
-    HIR::datatype_t type = nullptr;
-    if (node->func->expr_kind == HIR::expr_::ExprKind::kId) {
-      HIR::Id_t id = dynamic_cast<HIR::Id_t>(node->func);
+    if (func->expr_kind == HIR::expr_::ExprKind::kId) {
+      HIR::Id_t id = dynamic_cast<HIR::Id_t>(func);
       ref = id->ref;
-      type = id->type;
     }
-    if (node->func->expr_kind == HIR::expr_::ExprKind::kTemplatedId) {
-      HIR::TemplatedId_t id = dynamic_cast<HIR::TemplatedId_t>(node->func);
+    if (func->expr_kind == HIR::expr_::ExprKind::kTemplatedId) {
+      HIR::TemplatedId_t id = dynamic_cast<HIR::TemplatedId_t>(func);
       ref = id->ref;
-      type = id->type;
     }
     // generate based on the kind of reference
-    if (ref != nullptr) {
-      if (ref->resolved_kind ==
-                 HIR::resolved_::ResolvedKind::kVVMOpRef) {
-        // inline builtin functions
-        HIR::VVMOpRef_t ptr = dynamic_cast<HIR::VVMOpRef_t>(ref);
-        size_t opcode = ptr->opcode;
-        result = reserve_space();
-        params.push_back(result);
-        emit(opcode, params);
-      } else if (ref->resolved_kind ==
-                 HIR::resolved_::ResolvedKind::kFuncRef) {
-        // invoke user-defined functions
-        HIR::FuncRef_t fr = dynamic_cast<HIR::FuncRef_t>(ref);
-        HIR::FunctionDef_t fd = dynamic_cast<HIR::FunctionDef_t>(fr->ref);
-        VVM::operand_t op = func_map_get(fd);
-        result = reserve_space();
-        params.push_back(result);
-        VVM::operand_t length =
-          VVM::encode_operand(params.size(), VVM::OpMask::kImmediate);
-        params.insert(params.begin(), length);
-        params.insert(params.begin(), op);
-        emit(VVM::opcodes::call, params);
-      } else if (ref->resolved_kind ==
-                 HIR::resolved_::ResolvedKind::kDataRef) {
-        // fill members of type constructors
-        result = reserve_space();
-        HIR::Kind_t k = dynamic_cast<HIR::Kind_t>(type);
-        VVM::operand_t typee = get_type_operand(k->type);
-        emit(VVM::opcodes::alloc, {typee, result});
-        for (size_t i = 0; i < params.size(); i++) {
-          VVM::operand_t offset =
-            VVM::encode_operand(i, VVM::OpMask::kImmediate);
-          VVM::operand_t member = reserve_space();
-          emit(VVM::opcodes::member, {result, offset, member});
-          VVM::operand_t value = params[i];
-          VVM::operand_t typee = get_type_operand(node->args[i]->type);
-          emit(VVM::opcodes::assign, {value, typee, member});
-        }
-      } else {
-        nyi("FunctionCall not on builtin, function, or kind");
+    if (type != nullptr && type->datatype_kind ==
+        HIR::datatype_::DatatypeKind::kKind) {
+      // fill members of type constructors
+      result = reserve_space();
+      HIR::Kind_t k = dynamic_cast<HIR::Kind_t>(type);
+      VVM::operand_t typee = get_type_operand(k->type);
+      emit(VVM::opcodes::alloc, {typee, result});
+      for (size_t i = 0; i < params.size(); i++) {
+        VVM::operand_t offset =
+          VVM::encode_operand(i, VVM::OpMask::kImmediate);
+        VVM::operand_t member = reserve_space();
+        emit(VVM::opcodes::member, {result, offset, member});
+        VVM::operand_t value = params[i];
+        VVM::operand_t typee = get_type_operand(node->args[i]->type);
+        emit(VVM::opcodes::assign, {value, typee, member});
       }
+    } else if (ref != nullptr && ref->resolved_kind ==
+               HIR::resolved_::ResolvedKind::kVVMOpRef) {
+      // inline builtin functions
+      HIR::VVMOpRef_t ptr = dynamic_cast<HIR::VVMOpRef_t>(ref);
+      size_t opcode = ptr->opcode;
+      result = reserve_space();
+      params.push_back(result);
+      emit(opcode, params);
+    } else if (ref != nullptr && ref->resolved_kind ==
+               HIR::resolved_::ResolvedKind::kFuncRef) {
+      // invoke user-defined functions
+      HIR::FuncRef_t fr = dynamic_cast<HIR::FuncRef_t>(ref);
+      HIR::FunctionDef_t fd = dynamic_cast<HIR::FunctionDef_t>(fr->ref);
+      VVM::operand_t op = func_map_get(fd);
+      result = reserve_space();
+      params.push_back(result);
+      VVM::operand_t length =
+        VVM::encode_operand(params.size(), VVM::OpMask::kImmediate);
+      params.insert(params.begin(), length);
+      params.insert(params.begin(), op);
+      emit(VVM::opcodes::call, params);
     } else {
-      nyi("FunctionCall not on id");
+      nyi("FunctionCall not on builtin, function, or kind");
     }
     return result;
   }
