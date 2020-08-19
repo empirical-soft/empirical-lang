@@ -697,6 +697,8 @@ Timestamp(nil)
 
 ## Dataframes
 
+*All sample CSV files are available to [download here](https://github.com/empirical-soft/replit) or [use on repl.it](https://repl.it/github/empirical-soft/replit).*
+
 Empirical has statically typed Dataframes. The types can be inferred by `load()` if the parameter is a comptime literal.
 
 ```
@@ -756,7 +758,7 @@ We can also perform aggregations.
 
 ```
 
-Aggregations can take arbitrary expression, including user-defined functions. Here is an example of a volume-weighted average price (VWAP):
+Aggregations can take arbitrary expressions, including user-defined functions. Here is an example of a volume-weighted average price (VWAP):
 
 ```
 >>> func wavg(ws, vs) = sum(ws * vs) / sum(ws)

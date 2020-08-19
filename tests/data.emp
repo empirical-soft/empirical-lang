@@ -17,3 +17,11 @@ print(trades.price)
 print(trades.size)
 ##[100, 200]
 
+
+data Person = {name: String, age: Int64}
+
+let person = Person("A", 1)
+
+print(person.name)
+##A
+
