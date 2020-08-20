@@ -509,8 +509,14 @@ class SemaVisitor : public AST::BaseVisitor {
       // check that we can overload if the symbol already exists
       auto& resolveds = iter->second;
       for (size_t i = 0; i < resolveds.size(); i++) {
-        if (!is_overloadable(resolveds[i], ptr)) {
-          if (interactive_ && is_overridable(resolveds[i])) {
+        if (!is_overloadable(resolveds[i], ptr) &&
+            !is_generalization(resolveds[i], ptr)) {
+          if (try_specialization(resolveds[i], ptr)) {
+            // add managled name to scope
+            std::string new_symbol = make_generic(ptr);
+            store_symbol(new_symbol, ptr);
+            return true;
+          } else if (interactive_ && is_overridable(resolveds[i])) {
             resolveds[i] = ptr;
             return true;
           } else {
@@ -518,8 +524,10 @@ class SemaVisitor : public AST::BaseVisitor {
           }
         }
       }
+      // append overloaded
       resolveds.push_back(ptr);
     } else {
+      // create a new resolved name
       scope.map.emplace(symbol, std::initializer_list<HIR::resolved_t>{ptr});
     }
     return true;
@@ -656,6 +664,22 @@ class SemaVisitor : public AST::BaseVisitor {
     }
     result += "}";
     return result;
+  }
+
+  // turn a regular function definition into an instance of a generic
+  std::string make_generic(HIR::resolved_t node) {
+    HIR::FuncRef_t ref = dynamic_cast<HIR::FuncRef_t>(node);
+    HIR::FunctionDef_t def = dynamic_cast<HIR::FunctionDef_t>(ref->ref);
+    std::string name = def->name + "(";
+    if (def->args.size() >= 1) {
+      name += to_string(def->args[0]->type);
+      for (size_t i = 1; i < def->args.size(); i++) {
+        name += ", " + to_string(def->args[i]->type);
+      }
+    }
+    name += ")";
+    def->name = name;
+    return name;
   }
 
   // return string of a literal value
@@ -888,7 +912,7 @@ class SemaVisitor : public AST::BaseVisitor {
             node->datatype_kind == HIR::datatype_::DatatypeKind::kArray);
   }
 
-  // can overload types and functions with new functions (prohibit sema)
+  // can overload types and functions with new functions (prohibit sema refs)
   bool is_overloadable(HIR::resolved_t first, HIR::resolved_t second) {
     switch (first->resolved_kind) {
       // overload types with functions
@@ -920,6 +944,55 @@ class SemaVisitor : public AST::BaseVisitor {
       default:
         return false;
     }
+  }
+
+  // can generalize a specific function
+  bool is_generalization(HIR::resolved_t first, HIR::resolved_t second) {
+    switch (first->resolved_kind) {
+      case HIR::resolved_::ResolvedKind::kVVMTypeRef:
+      case HIR::resolved_::ResolvedKind::kDataRef:
+      case HIR::resolved_::ResolvedKind::kVVMOpRef:
+      case HIR::resolved_::ResolvedKind::kFuncRef: {
+        return second->resolved_kind ==
+          HIR::resolved_::ResolvedKind::kGenericRef;
+      }
+      default:
+        return false;
+    }
+  }
+
+  // try to specialize a generic function; overwrite instance in interactive
+  bool try_specialization(HIR::resolved_t first, HIR::resolved_t second) {
+    if (first->resolved_kind == HIR::resolved_::ResolvedKind::kGenericRef &&
+        second->resolved_kind == HIR::resolved_::ResolvedKind::kFuncRef) {
+      // extract generic
+      HIR::GenericRef_t gen_ref = dynamic_cast<HIR::GenericRef_t>(first);
+      HIR::GenericDef_t gen_def =
+        dynamic_cast<HIR::GenericDef_t>(gen_ref->ref);
+      // extract specialized
+      HIR::FuncRef_t func_ref = dynamic_cast<HIR::FuncRef_t>(second);
+      HIR::FunctionDef_t func_def =
+        dynamic_cast<HIR::FunctionDef_t>(func_ref->ref);
+      HIR::datatype_t new_type = get_type(func_def);
+      // check that all instances are of different types
+      for (size_t i = 0; i < gen_def->instantiated.size(); i++) {
+        HIR::stmt_t instance = gen_def->instantiated[i];
+        HIR::FunctionDef_t def = dynamic_cast<HIR::FunctionDef_t>(instance);
+        if (is_same_type(get_type(def), new_type)) {
+          if (interactive_) {
+            // override
+            gen_def->instantiated[i] = func_def;
+            return true;
+          } else {
+            return false;
+          }
+        }
+      }
+      // append new instance
+      gen_def->instantiated.push_back(func_def);
+      return true;
+    }
+    return false;
   }
 
   // can override anything that isn't builtin
