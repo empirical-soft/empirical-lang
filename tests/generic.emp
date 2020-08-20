@@ -13,6 +13,16 @@ print(foo(4.3, 20.1))
 print(foo(4, 20))
 ##24
 
+
+# specialization
+func foo(a: Char, b: Char):
+  return String(a) + String(b)
+end
+
+print(foo('a', 'b'))
+##ab
+
+
 # CTFE example
 let s = foo("A", "B")
 print(s)

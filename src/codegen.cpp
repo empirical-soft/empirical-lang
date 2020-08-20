@@ -332,6 +332,12 @@ class CodegenVisitor : public HIR::BaseVisitor {
       return VVM::operand_t(0);
     }
 
+    // specialized generics are seen twice, so return first instance
+    auto iter = func_map_.find(node);
+    if (iter != func_map_.end()) {
+      return iter->second;
+    }
+
     VVM::FunctionDef* fd = new VVM::FunctionDef;
     fd->name = node->name;
     // attach everything to a global now so body can have recursion
