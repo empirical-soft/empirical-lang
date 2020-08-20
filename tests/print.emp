@@ -1,0 +1,76 @@
+# Tests for print()
+
+# scalar
+
+print(15)
+##15
+
+print(15.5)
+##15.5
+
+print(true)
+##true
+
+print("Hello")
+##Hello
+
+print('c')
+##c
+
+print(Timestamp("2020-08-20 22:17:32.529615"))
+##2020-08-20 22:17:32.529615
+
+print(1s)
+##00:00:01
+
+print(Time("22:17:32.529615"))
+##22:17:32.529615
+
+print(Date("2020-08-20"))
+##2020-08-20
+
+# vector
+
+print([15, 16])
+##[15, 16]
+
+print([15.5, 16.6])
+##[15.5, 16.6]
+
+print([true, false])
+##[true, false]
+
+print(["Hello", "World"])
+##[Hello, World]
+
+print(['c', 'd'])
+##[c, d]
+
+print([Timestamp("2020-08-20 22:17:32.529615"), Timestamp("2020-08-21 22:17:33.529615")])
+##[2020-08-20 22:17:32.529615, 2020-08-21 22:17:33.529615]
+
+print([1s, 5ms])
+##[00:00:01, 00:00:00.005]
+
+print([Time("22:17:32.529615"), Time("22:17:33.529615")])
+##[22:17:32.529615, 22:17:33.529615]
+
+print([Date("2020-08-20"), Date("2020-08-21")])
+##[2020-08-20, 2020-08-21]
+
+# UDT
+
+data Person:
+  name: String,
+  age: Int64
+end
+
+print(Person("AA", 11))
+## name age
+##   AA  11
+
+print(!Person(["AA", "BB"], [11, 22]))
+## name age
+##   AA  11
+##   BB  22
+

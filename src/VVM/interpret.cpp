@@ -964,10 +964,10 @@ WRAPPER_V_S(count)
     std::vector<T>& xs = get_reference<std::vector<T>>(op1);
     std::string s = "[";
     if (!xs.empty()) {
-      s += to_repr(xs[0]);
+      s += super_cast<T, std::string>(xs[0]);
     }
     for (size_t i = 1; i < xs.size(); i++) {
-      s += ", " + to_repr(xs[i]);
+      s += ", " + super_cast<T, std::string>(xs[i]);
     }
     s += "]";
     std::cout << s << std::endl;

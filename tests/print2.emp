@@ -1,0 +1,12 @@
+# Additional tests for print() -- needs new session
+
+data Person:
+  name: String,
+  age: Int64
+end
+
+func String(p: Person) = p.name + " is " + String(p.age) + " years old"
+
+print(Person("CC", 33))
+##CC is 33 years old
+
