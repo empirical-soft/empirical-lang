@@ -6,9 +6,6 @@ These tests cover traits and modes.
 >>> traits_of(5)
 pure, transform, linear
 
->>> traits_of(print)
-none
-
 >>> traits_of(print(5))
 none
 

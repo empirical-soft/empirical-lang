@@ -837,6 +837,9 @@ class SemaVisitor : public AST::BaseVisitor {
       return nullptr;
     }
 
+    // use the template's resolved name since it will be different
+    std::string full_name = '!' + node->name;
+
     // see if the Dataframe already exists
     HIR::resolved_t ref = nullptr;
     Scope::Resolveds resolveds = find_symbol(name);
@@ -863,12 +866,12 @@ class SemaVisitor : public AST::BaseVisitor {
       }
       pop_scope();
       HIR::expr_t single = nullptr;
-      HIR::stmt_t new_node = HIR::DataDef(name, node->templates, body, single,
-                                          scope);
+      HIR::stmt_t new_node = HIR::DataDef(full_name, node->templates, body,
+                                          single, scope);
       ref = HIR::DataRef(new_node);
       store_symbol(name, ref);
     }
-    return HIR::UDT(name, ref);
+    return HIR::UDT(full_name, ref);
   }
 
   bool is_string_type(HIR::datatype_t node) {

@@ -2,8 +2,18 @@
 
 let prices = load("sample_csv/prices.csv")
 
-let df = from prices select mid=(low+high)/2.0 where symbol == "BRK.B"
+let df = from prices select symbol, date, mid=(low+high)/2.0 where symbol == "BRK.B"
 
-print(df.mid)
-##[163.575, 163.785, 163.16, 163.22, 162.635, 162.075, 161.74, 161.235, 162.32, 160.65]
+print(df)
+## symbol       date     mid
+##  BRK.B 2017-01-03 163.575
+##  BRK.B 2017-01-04 163.785
+##  BRK.B 2017-01-05 163.160
+##  BRK.B 2017-01-06 163.220
+##  BRK.B 2017-01-09 162.635
+##  BRK.B 2017-01-10 162.075
+##  BRK.B 2017-01-11 161.740
+##  BRK.B 2017-01-12 161.235
+##  BRK.B 2017-01-13 162.320
+##  BRK.B 2017-01-17 160.650
 

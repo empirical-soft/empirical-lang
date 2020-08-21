@@ -57,8 +57,6 @@ def _make_opcodes():
       # (Value,Kind)->Value
       ('', 'append',       '', 3),
       # (Value,Kind,Value)
-      ('', 'repr',         '', 3),
-      # (Value,Kind)->String
       ('', 'where',        '', 4),
       # (Value,[Bool],Kind)->Value
       ('', 'br',           '', 1),
@@ -118,12 +116,6 @@ def _make_opcodes():
             for src in srcs:
                 for p in patterns:
                     opcodes += [(tgt, 'cast', p % (src, tgt), 2)]
-
-    # print function
-    patterns = ['%s->()', '[%s]->()']
-    for p in patterns:
-        for t in all_types:
-            opcodes += [('print', 'print', p % t, 2)]
 
     # binary operators -- boolean
     operators = [('or', 'or'), ('and', 'and')]
@@ -280,6 +272,11 @@ def _make_opcodes():
     opcodes += [("_csv_load", "load", "(String,Kind)->Value", 3)]
     opcodes += [("_csv_store", "store", "(Kind,Value,String)->()", 4)]
     opcodes += [("_csv_infer", "csv_infer", "String->String", 2)]
+
+    # output operators
+    opcodes += [("_repr", "repr", "(Value,Kind)->String", 3)]
+    opcodes += [("_print", "print", "String->()", 2)]
+    opcodes += [("_print", "print", "[String]->()", 2)]
 
     return opcodes
 
@@ -520,7 +517,7 @@ class BuiltinsWriter(HeaderWriter):
                 traits = all_traits
                 d = {'_csv_load': io_traits | autostream,
                      '_csv_store': none,
-                     'print': none,
+                     '_print': none,
                      'unique': ca_traits,
                      'filter': ca_traits,
                      'idx': ra_traits,
