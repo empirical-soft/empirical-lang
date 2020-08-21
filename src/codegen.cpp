@@ -918,6 +918,10 @@ class CodegenVisitor : public HIR::BaseVisitor {
     return last_stmt_value;
   }
 
+  antlrcpp::Any visitMembersOf(HIR::MembersOf_t node) override {
+    return visit(node->member_list);
+  }
+
   antlrcpp::Any visitMember(HIR::Member_t node) override {
     // implied members should have saved the source's register already
     auto iter = implied_reg_map_.find(node->value);
