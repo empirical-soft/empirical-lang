@@ -49,6 +49,7 @@ module HIR
        | ModeOf(expr arg, string s)
        | Columns(expr arg, string s)
        | Compile(expr arg, stmt* body)
+       | MembersOf(expr arg, expr member_list)
        | Member(expr value, identifier member, resolved ref)
        | Subscript(expr value, slice slice)
        | UserDefinedLiteral(expr literal, identifier suffix, expr? inline_expr,

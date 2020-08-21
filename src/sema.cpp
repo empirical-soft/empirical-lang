@@ -1386,7 +1386,8 @@ class SemaVisitor : public AST::BaseVisitor {
     kTraitsOf,
     kModeOf,
     kColumns,
-    kCompile
+    kCompile,
+    kMembersOf
   };
 
   // try to internally invoke function; return nullptr if unable
@@ -1414,6 +1415,9 @@ class SemaVisitor : public AST::BaseVisitor {
           }
           case SemaCodes::kCompile: {
             return sema_function_compile(args);
+          }
+          case SemaCodes::kMembersOf: {
+            return sema_function_members_of(args);
           }
         }
       }
@@ -1505,6 +1509,28 @@ class SemaVisitor : public AST::BaseVisitor {
     return HIR::Compile(a, body, typee, traits, mode, a->name);
   }
 
+  // members_of() function
+  HIR::expr_t sema_function_members_of(const std::vector<HIR::expr_t>& args) {
+    HIR::expr_t a = args[0];
+    HIR::datatype_t t = a->type;
+    if (is_kind_type(t)) {
+      t = get_underlying_type(t);
+    }
+    // the placeholder is if this is not a UDT
+    std::vector<AST::expr_t> items(1, AST::Str("<placeholder>"));
+    if (get_scope(t)) {
+      HIR::DataDef_t dd = get_data_def(t);
+      for (HIR::declaration_t d: dd->body) {
+        items.push_back(AST::Str(d->name));
+      }
+    }
+    HIR::expr_t v = visit(AST::List(items));
+    HIR::List_t list = dynamic_cast<HIR::List_t>(v);
+    list->values.erase(list->values.begin());
+    return HIR::MembersOf(a, list, list->type, all_traits,
+                          HIR::compmode_t::kComptime, a->name);
+  }
+
   // save all builtin items so that id resolution will find them
   void save_builtins() {
     store_symbol("type_of", HIR::SemaFuncRef(size_t(SemaCodes::kTypeOf),
@@ -1520,6 +1546,9 @@ class SemaVisitor : public AST::BaseVisitor {
       HIR::FuncType({nullptr}, HIR::Void(), all_traits)));
 
     store_symbol("compile", HIR::SemaFuncRef(size_t(SemaCodes::kCompile),
+      HIR::FuncType({nullptr}, HIR::Void(), all_traits)));
+
+    store_symbol("members_of", HIR::SemaFuncRef(size_t(SemaCodes::kMembersOf),
       HIR::FuncType({nullptr}, HIR::Void(), all_traits)));
 
     store_symbol("Type", HIR::SemaTypeRef(HIR::Kind(nullptr)));
