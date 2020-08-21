@@ -109,6 +109,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <ctype.h>
 #include <sys/stat.h>
@@ -168,6 +169,7 @@ enum KEY_ACTION{
 	CTRL_T = 20,        /* Ctrl-t */
 	CTRL_U = 21,        /* Ctrl+u */
 	CTRL_W = 23,        /* Ctrl+w */
+	CTRL_Z = 26,        /* Ctrl+z */
 	ESC = 27,           /* Escape */
 	BACKSPACE =  127    /* Backspace */
 };
@@ -830,6 +832,17 @@ static int linenoiseEdit(int stdin_fd, int stdout_fd, char *buf, size_t buflen, 
         case CTRL_C:     /* ctrl-c */
             errno = EAGAIN;
             return -1;
+/* https://github.com/antirez/linenoise/issues/141#issuecomment-433280306 */
+        case CTRL_Z:     /* ctrl-z */
+#ifdef SIGTSTP
+            /* send ourselves SIGSUSP */
+            disableRawMode(STDIN_FILENO);
+            raise(SIGTSTP);
+            /* and resume */
+            enableRawMode(STDIN_FILENO);
+            refreshLine(&l);
+#endif
+            continue;
         case BACKSPACE:   /* backspace */
         case 8:     /* ctrl-h */
             linenoiseEditBackspace(&l);
