@@ -253,8 +253,12 @@ def _make_opcodes():
     for k, v in operators:
         for t in integer_types:
             opcodes += [(v, k, '%s->[%s]' % (t, t), 2)]
+    operators = [('reverse', 'reverse')]
+    for k, v in operators:
+        for t in all_types:
+            opcodes += [(v, k, '[%s]->[%s]' % (t, t), 2)]
 
-    # manually defined operators -- scalar and vector
+    # del operator
     operators = [('del', 1)]
     patterns = ['%s', '[%s]']
     for k, v in operators:
@@ -262,11 +266,14 @@ def _make_opcodes():
             for t in all_types:
                 opcodes += [('', k, p % t, v)]
 
-    # manually defined operators -- vector only
+    # idx operator
     operators = [('idx', 3)]
     for k, v in operators:
         for t in all_types:
             opcodes += [('', k, '([%s],Int64)->%s' % (t, t), v)]
+
+    # reverse operator
+    opcodes += [("_reverse", "reverse", "(Value,Kind)->Value", 3)]
 
     # operators on CSV files
     opcodes += [("_csv_load", "load", "(String,Kind)->Value", 3)]
@@ -720,6 +727,22 @@ class ParseWriter(HeaderWriter):
         self.emit('')
 
 
+class ReverseWriter(HeaderWriter):
+    """ Write reverser logic """
+
+    def run(self):
+        self.emit('void reverse_array(vvm_types t, Value src, Value dst) {')
+        self.emit('switch (t) {', 1)
+        for t in types:
+            self.emit('case vvm_types::%ss:' % t[1], 2)
+            self.emit('return reverse_array_s<%s>(src, dst);' % t[2], 3)
+            self.emit('case vvm_types::%sv:' % t[1], 2)
+            self.emit('return reverse_array_v<%s>(src, dst);' % t[2], 3)
+        self.emit('}', 1)
+        self.emit('}')
+        self.emit('')
+
+
 class AssignWriter(HeaderWriter):
     """ Write assign logic """
 
@@ -1042,6 +1065,7 @@ def main(output_directory):
           DispatchWriter('dispatch.h'),
           ReprWriter('repr.h'),
           ParseWriter('parse.h'),
+          ReverseWriter('reverse.h'),
           AssignWriter('assign.h'),
           AppendWriter('append.h'),
           WhereWriter('where.h'),
