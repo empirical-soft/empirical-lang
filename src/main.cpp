@@ -41,6 +41,39 @@ func len(xs) => len(compile("xs." + members_of(xs)[0]))
 func reverse(df) -> type_of(df) => _reverse(df, type_of(df))
 )";
 
+const std::string empirical_help =
+R"(
+# Types
+
+  Bool        true, false
+  Char        'a', '\n'
+  String      "Hello", "\nWorld"
+  Int64       45, nil
+  Float64     4.5, nan
+  Date        Date("2020-08-01")
+  Time        Time("12:30:00"), Time("12:30:00.000123")
+  Timestamp   Timestamp("2020-08-01 12:30:00")
+  Timedelta   5m, Timedelta("00:05:00")
+
+# Operators
+
+  comparison:    == != > >= < <=
+  arithmetic:    + - * / %
+  bitwise:       & | << >>
+  boolean:       and or not
+
+# Common Functions
+
+  bar      count    exit     len      load     now
+  print    prod     range    reverse  store    sum
+
+# Trigonometry
+
+  acos   acosh  asin   asinh  atan   atanh
+  cos    cosh   sin    sinh   tan    tanh
+
+https://www.empirical-soft.com)";
+
 // global variables from command line; extern these as needed
 bool kDumpAst = false;
 bool kDumpHir = false;
@@ -145,6 +178,8 @@ Options:
     // interactive mode
     std::cout << "Empirical version " << EMPIRICAL_VERSION << std::endl;
     std::cout << "Copyright (C) 2019--2020 Empirical Software Solutions, LLC"
+              << std::endl;
+    std::cout << "Type '?' for help. Type '\\help' for magic commands."
               << std::endl << std::endl;
     Linenoise ln(argv[0]);
     // uncomment the below line to work with LLDB
@@ -155,6 +190,12 @@ Options:
         break;
       }
       bool timer_desired = false;
+
+      // check for '?'
+      if (line == "?") {
+        std::cout << empirical_help << std::endl;
+        line.clear();
+      }
 
       // check for 'magic' commands
       if (starts_with(line, "\\")) {
@@ -218,7 +259,8 @@ Options:
           std::cerr << e.what() << std::endl;
         }
         catch (VVM::ExitException& e) {
-          std::cerr << "To exit: use 'exit', 'quit', or Ctrl-D" << std::endl;
+          std::cerr << "To exit: use 'exit', 'quit', or Ctrl-D" << std::endl
+                    << std::endl;
         }
       } else {
         std::cout << std::endl;
@@ -247,7 +289,7 @@ Options:
         result = std::string(e.what()) + '\n';
       }
       catch (VVM::ExitException& e) {
-        result = "To exit: use 'exit', 'quit', or Ctrl-D\n";
+        result = "To exit: use 'exit', 'quit', or Ctrl-D\n\n";
       }
 
       if (result != t.out) {
