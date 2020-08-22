@@ -388,6 +388,14 @@ UNIT(d,86400000000000)
     return result;
   }
 
+  // invert all elements
+  template<class T>
+  std::vector<T> internal_reverse(const std::vector<T>& xs) {
+    std::vector<T> result(xs.size());
+    std::reverse_copy(xs.begin(), xs.end(), result.begin());
+    return result;
+  }
+
 #define WRAPPER_S_V(FUNC) template<class T, class U>\
 void FUNC##_s(operand_t left, operand_t result) {\
   T x = get_value<T>(left);\
@@ -402,12 +410,21 @@ void FUNC##_v(operand_t left, operand_t result) {\
   y = internal_##FUNC(xs);\
 }
 
+#define WRAPPER_V_V(FUNC) template<class T, class U>\
+void FUNC##_v(operand_t left, operand_t result) {\
+  std::vector<T>& xs = get_reference<std::vector<T>>(left);\
+  std::vector<U>& ys = get_reference<std::vector<U>>(result);\
+  ys = internal_##FUNC(xs);\
+}
+
 WRAPPER_S_V(range)
 WRAPPER_V_S(len)
 WRAPPER_V_S(count)
+WRAPPER_V_V(reverse)
 
 #undef WRAPPER_S_V
 #undef WRAPPER_V_S
+#undef WRAPPER_V_V
 
   /*** REPR ***/
 
@@ -930,6 +947,61 @@ WRAPPER_V_S(count)
     Dataframe& y = get_reference<Dataframe>(dst);
     std::vector<int64_t>& idxs = get_reference<std::vector<int64_t>>(indices);
     y = where_rows(src, idxs, typee >> 2);
+  }
+
+  /*** REVERSE ***/
+
+  // copy a scalar value -- this is just to handle non-DF UDT sanely
+  template<class T>
+  void reverse_array_s(Value src, Value dst) {
+    T& x = *reinterpret_cast<T*>(src);
+    T& y = *reinterpret_cast<T*>(dst);
+    y = x;
+  }
+
+  // invert an array
+  template<class T>
+  void reverse_array_v(Value src, Value dst) {
+    std::vector<T>& xs = *reinterpret_cast<std::vector<T>*>(src);
+    std::vector<T>& ys = *reinterpret_cast<std::vector<T>*>(dst);
+    ys = internal_reverse(xs);
+  }
+
+#include <VVM/reverse.h>
+
+  // invert data
+  Dataframe reverser(operand_t src, type_t typee) {
+    // check tag
+    TypeMask mask = TypeMask(typee & 1);
+    type_t num = typee >> 1;
+    switch (mask) {
+      case TypeMask::kBuiltIn: {
+        std::ostringstream oss;
+        oss << "Should have invoked internal_reverse() on $" << num;
+        throw std::logic_error(oss.str());
+      }
+      case TypeMask::kUserDefined: {
+        auto members = get_type_members(typee, types_);
+        Dataframe& df_src = get_reference<Dataframe>(src);
+        Dataframe& df_dst = *reinterpret_cast<Dataframe*>(allocate(typee));
+
+        // reverse each column
+        for (size_t col = 0; col < df_src.size(); col++) {
+          vvm_types vvm_typee =
+            static_cast<vvm_types>(members[col].typee >> 1);
+          reverse_array(vvm_typee, df_src[col], df_dst[col]);
+        }
+
+        return df_dst;
+      }
+    }
+  }
+
+  // reverse operation
+  void reverse(operand_t src, operand_t typee, operand_t dst) {
+    verify_is_type(typee);
+    Dataframe& y = get_reference<Dataframe>(dst);
+    y = reverser(src, typee >> 2);
   }
 
   /*** MISC ***/

@@ -1713,7 +1713,6 @@ class SemaVisitor : public AST::BaseVisitor {
       d->mode = HIR::compmode_t::kNormal;
       args.push_back(d);
     }
-    pop_scope();
 
     // get explicit return type
     HIR::expr_t explicit_rettype = nullptr;
@@ -1729,6 +1728,7 @@ class SemaVisitor : public AST::BaseVisitor {
                   << " has invalid type" << std::endl;
       }
     }
+    pop_scope();
 
     // until explicit traits are a thing
     size_t traits = all_traits;
@@ -1766,7 +1766,6 @@ class SemaVisitor : public AST::BaseVisitor {
       d->mode = HIR::compmode_t::kNormal;
       args.push_back(d);
     }
-    pop_scope();
 
     // get explicit return type
     HIR::expr_t explicit_rettype = nullptr;
@@ -1782,6 +1781,7 @@ class SemaVisitor : public AST::BaseVisitor {
                   << " has invalid type" << std::endl;
       }
     }
+    pop_scope();
 
     // until explicit traits are a thing
     size_t traits = all_traits;
