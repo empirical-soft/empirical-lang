@@ -373,7 +373,7 @@ The above is an example of *expression syntax*, where the function is defined as
 
 ```
 
-The argument types are determined from the caller, but can be listed explicitly.
+Functions are *generic* by default, meaning that the argument types are determined from the caller. But types can be listed explicitly.
 
 ```
 >>> func add2(x: Int64, y: Int64): return x + y end
@@ -402,6 +402,35 @@ Error: unable to match overloaded function add2
     argument type at position 0 does not match: Float64 vs Int64
   candidate: (Bool, Bool) -> Bool
     argument type at position 0 does not match: Float64 vs Bool
+
+```
+
+Generic functions can be *specialized* by overloaded with a specific type.
+
+```
+>>> func add(a: Char, b: Char) = String(a) + String(b)
+
+>>> add(3, 4)
+7
+
+>>> add('a', 'b')
+"ab"
+
+```
+
+Generic functions can have *placeholders* to provide some degree of strong typing.
+
+```
+>>> func mult2[T](a: [T], b: T) = a * b
+
+>>> mult2([1, 2, 3], 4)
+[4, 8, 12]
+
+>>> mult2(1, 4)
+Error: argument type at position 0 does not match: Int64 vs [T]
+
+>>> mult2([1, 2, 3], 4.0)
+Error: argument type at position 1 does not match: Float64 vs T aka Int64
 
 ```
 

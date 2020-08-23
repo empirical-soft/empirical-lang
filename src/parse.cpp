@@ -226,6 +226,11 @@ class ParseVisitor : public EmpiricalVisitor {
       templates = visit(ctx->templates).as<decltype(templates)>();
     }
 
+    std::vector<AST::declaration_t> placeholders;
+    if (ctx->placeholders) {
+      placeholders = visit(ctx->placeholders).as<decltype(placeholders)>();
+    }
+
     std::vector<AST::declaration_t> args;
     if (ctx->args) {
       args = visit(ctx->args).as<decltype(args)>();
@@ -257,7 +262,7 @@ class ParseVisitor : public EmpiricalVisitor {
     }
 
     // determine if this was a generic function or a macro
-    bool is_generic = false, is_macro = false;
+    bool is_generic = !placeholders.empty(), is_macro = false;
     for (AST::declaration_t a: args) {
       if (a->explicit_type == nullptr) {
         is_generic = true;
@@ -284,7 +289,7 @@ class ParseVisitor : public EmpiricalVisitor {
                                         force_inline, explicit_rettype,
                                         docstring);
     if (is_generic) {
-      node = AST::GenericDef(node, args, explicit_rettype);
+      node = AST::GenericDef(node, placeholders, args, explicit_rettype);
     }
     if (!templates.empty()) {
       node = AST::TemplateDef(node, templates);

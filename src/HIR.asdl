@@ -12,9 +12,10 @@ module HIR
                      bool force_inline, expr? explicit_rettype,
                      string? docstring, datatype rettype, size_t traits,
                      size_t scope, pointer original)
-       | GenericDef(pointer original, declaration* args,
-                    expr? explicit_rettype, datatype rettype, size_t traits,
-                    stmt* instantiated, size_t scope)
+       | GenericDef(pointer original, declaration* placeholders,
+                    declaration* args, expr? explicit_rettype,
+                    datatype rettype, size_t traits, stmt* instantiated,
+                    size_t scope)
        | MacroDef(pointer original, declaration* args,
                   expr? explicit_rettype, datatype rettype, size_t traits,
                   stmt implied_template)
@@ -92,6 +93,7 @@ module HIR
            | Array(datatype type)
            | FuncType(datatype* argtypes, datatype rettype, size_t traits)
            | TemplateType(datatype* types)
+           | Placeholder(identifier name, identifier unique_name)
            | Kind(datatype type)
            | Void
 

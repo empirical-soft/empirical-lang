@@ -218,6 +218,46 @@ class SemaVisitor : public AST::BaseVisitor {
     }
   }
 
+  /* generic placeholders */
+
+  // maps a placeholder's unique name to the caller's type
+  std::unordered_map<std::string, HIR::datatype_t> placeholder_map_;
+
+  // returns the associated datatype for a placeholder
+  HIR::datatype_t get_placeholder(HIR::Placeholder_t place) {
+    auto iter = placeholder_map_.find(place->unique_name);
+    if (iter != placeholder_map_.end()) {
+      return iter->second;
+    }
+    return nullptr;
+  }
+
+  // sets the associated datatype for a placeholder
+  void set_placeholder(HIR::Placeholder_t place, HIR::datatype_t type) {
+    placeholder_map_[place->unique_name] = type;
+  }
+
+  // set a placeholder with the specific type
+  bool instantiate_placeholder(HIR::Placeholder_t place,
+                               HIR::datatype_t type) {
+    // check for Dataframes; we will store the underlying against place's
+    // unique, which will then allow make_dataframe() to build
+    if (place->name[0] == '!') {
+      if (!is_dataframe_type(type)) {
+        return false;
+      }
+      type = get_underlying_udt(to_string(type));
+    }
+
+    // set or compare the type
+    HIR::datatype_t instance = get_placeholder(place);
+    if (instance == nullptr) {
+      set_placeholder(place, type);
+      return true;
+    }
+    return is_same_type(instance, type);
+  }
+
   /* get info from a node */
 
   // return resolved item's type, or nullptr if not available
@@ -426,6 +466,9 @@ class SemaVisitor : public AST::BaseVisitor {
 
   // get underlying data definition from a user-defined type
   HIR::DataDef_t get_data_def(HIR::datatype_t node) {
+    if (node == nullptr) {
+      return nullptr;
+    }
     switch (node->datatype_kind) {
       case HIR::datatype_::DatatypeKind::kUDT: {
         HIR::UDT_t udt = dynamic_cast<HIR::UDT_t>(node);
@@ -612,6 +655,12 @@ class SemaVisitor : public AST::BaseVisitor {
         result += "}";
         return result;
       }
+      case HIR::datatype_::DatatypeKind::kPlaceholder: {
+        HIR::Placeholder_t place = dynamic_cast<HIR::Placeholder_t>(node);
+        HIR::datatype_t instance = get_placeholder(place);
+        return place->name + ((instance == nullptr) ? "" :
+                              (" aka " + to_string(instance)));
+      }
       case HIR::datatype_::DatatypeKind::kKind: {
         HIR::Kind_t k = dynamic_cast<HIR::Kind_t>(node);
         return "Kind(" + to_string(k->type) + ")";
@@ -719,7 +768,14 @@ class SemaVisitor : public AST::BaseVisitor {
     if (left == nullptr || right == nullptr) {
       return true;
     }
-    if (left->datatype_kind != right->datatype_kind) {
+    if (right->datatype_kind ==
+        HIR::datatype_::DatatypeKind::kPlaceholder) {
+      // this way we only have to worry about the left as generic
+      std::swap(left, right);
+    }
+    if (left->datatype_kind !=
+        HIR::datatype_::DatatypeKind::kPlaceholder &&
+        left->datatype_kind != right->datatype_kind) {
       return false;
     }
     switch (left->datatype_kind) {
@@ -781,6 +837,10 @@ class SemaVisitor : public AST::BaseVisitor {
         }
         break;
       }
+      case HIR::datatype_::DatatypeKind::kPlaceholder: {
+        HIR::Placeholder_t place = dynamic_cast<HIR::Placeholder_t>(left);
+        return instantiate_placeholder(place, right);
+      }
       case HIR::datatype_::DatatypeKind::kKind: {
         HIR::Kind_t leftk = dynamic_cast<HIR::Kind_t>(left);
         HIR::Kind_t rightk = dynamic_cast<HIR::Kind_t>(right);
@@ -795,8 +855,7 @@ class SemaVisitor : public AST::BaseVisitor {
 
   // ensure instantiated structure reflects array-ized underlying structure
   bool is_dataframe_type_valid(HIR::DataDef_t left, HIR::resolved_t ref) {
-    HIR::DataRef_t dr = dynamic_cast<HIR::DataRef_t>(ref);
-    HIR::DataDef_t right = dynamic_cast<HIR::DataDef_t>(dr->ref);
+    HIR::DataDef_t right = get_data_def(get_underlying_type(get_type(ref)));
 
     if (left->body.size() != right->body.size()) {
       return false;
@@ -812,7 +871,7 @@ class SemaVisitor : public AST::BaseVisitor {
   }
 
   // find scalar UDT for a Dataframe name (assumes leading '!')
-  HIR::DataDef_t get_underlying_udt(const std::string& name) {
+  HIR::datatype_t get_underlying_udt(const std::string& name) {
     // find name
     std::string underlying_name = name.substr(1);
     Scope::Resolveds underlying_resolveds = find_symbol(underlying_name);
@@ -824,7 +883,7 @@ class SemaVisitor : public AST::BaseVisitor {
     // extract UDT
     HIR::datatype_t type = get_type(ref);
     if (is_kind_type(type)) {
-      return get_data_def(get_underlying_type(type));
+      return get_underlying_type(type);
     }
     return nullptr;
   }
@@ -832,7 +891,7 @@ class SemaVisitor : public AST::BaseVisitor {
   // attempt to make Dataframe with the given type name
   HIR::datatype_t make_dataframe(const std::string& name) {
     // find underlying data definition first
-    HIR::DataDef_t node = get_underlying_udt(name);
+    HIR::DataDef_t node = get_data_def(get_underlying_udt(name));
     if (node == nullptr) {
       return nullptr;
     }
@@ -1045,7 +1104,7 @@ class SemaVisitor : public AST::BaseVisitor {
     return nullptr;
   }
 
-  bool is_generic(HIR::resolved_t node) {
+  bool is_generic_func(HIR::resolved_t node) {
     return (node != nullptr &&
             node->resolved_kind == HIR::resolved_::ResolvedKind::kGenericRef);
   }
@@ -1229,6 +1288,9 @@ class SemaVisitor : public AST::BaseVisitor {
           break;
         }
       }
+    }
+    if (!oss.str().empty()) {
+      placeholder_map_.clear();
     }
     return oss.str();
   }
@@ -1704,8 +1766,26 @@ class SemaVisitor : public AST::BaseVisitor {
     AST::FunctionDef_t fd = dynamic_cast<AST::FunctionDef_t>(node->original);
     std::string name = fd->name;
 
-    // evaluate arguments in new scope
+    // evaluate placeholders in new scope
     push_scope();
+    std::vector<HIR::declaration_t> placeholders;
+    for (AST::declaration_t p: node->placeholders) {
+      HIR::declaration_t d = visit(p);
+      if (d->type != nullptr || d->value != nullptr) {
+        sema_err_ << "Error: generic placeholder " << d->name
+                  << " is not allowed a type or value" << std::endl;
+      }
+      std::string unique = anon_data_name();
+      d->type = HIR::Kind(HIR::Placeholder(d->name, unique));
+      placeholders.push_back(d);
+      // preemptively set the Dataframe placeholder; share unique
+      AST::declaration_t df_p = AST::duplicate(p);
+      df_p->name = '!' + df_p->name;
+      HIR::declaration_t df_d = visit(df_p);
+      df_d->type = HIR::Kind(HIR::Placeholder(df_d->name, unique));
+    }
+
+    // evaluate arguments
     std::vector<HIR::declaration_t> args;
     for (AST::declaration_t a: node->args) {
       HIR::declaration_t d = visit(a);
@@ -1736,8 +1816,8 @@ class SemaVisitor : public AST::BaseVisitor {
     // construct node
     std::vector<HIR::stmt_t> instantiated;
     HIR::stmt_t new_node =
-      HIR::GenericDef(node->original, args, explicit_rettype, rettype, traits,
-                      instantiated, current_scope_);
+      HIR::GenericDef(node->original, placeholders, args, explicit_rettype,
+                      rettype, traits, instantiated, current_scope_);
     HIR::resolved_t ref = HIR::GenericRef(new_node);
 
     // store node
@@ -2419,7 +2499,7 @@ class SemaVisitor : public AST::BaseVisitor {
     // instantiate generic function
     HIR::Id_t id = construct_id(func);
     if (sema_err_.str().size() == starting_err_length) {
-      if (id != nullptr && is_generic(id->ref)) {
+      if (id != nullptr && is_generic_func(id->ref)) {
         // search to see if this already exists
         std::string instantiated_name = id->s + to_string_generics(args);
         Scope::Resolveds resolveds = find_symbol(instantiated_name);
@@ -2434,11 +2514,21 @@ class SemaVisitor : public AST::BaseVisitor {
           // use the scope of where the generic was defined to handle globals
           size_t saved_scope = current_scope_;
           current_scope_ = def->scope;
+          push_scope();
+          // create placeholder types
+          for (auto& p: def->placeholders) {
+            HIR::Placeholder_t place =
+              dynamic_cast<HIR::Placeholder_t>(get_underlying_type(p->type));
+            store_symbol(place->name,
+              HIR::SemaTypeRef(HIR::Kind(get_placeholder(place))));
+          }
           // create anonymous types for each function arg from caller's arg
           for (size_t i = 0; i < args.size(); i++) {
-            std::string name = anon_data_name();
-            store_symbol(name, HIR::SemaTypeRef(HIR::Kind(args[i]->type)));
-            original->args[i]->explicit_type = AST::Id(name);
+            if (original->args[i]->explicit_type == nullptr) {
+              std::string name = anon_data_name();
+              store_symbol(name, HIR::SemaTypeRef(HIR::Kind(args[i]->type)));
+              original->args[i]->explicit_type = AST::Id(name);
+            }
           }
           // run visitor; func def saves the duplicated AST pointer
           original->name = instantiated_name;
@@ -2446,8 +2536,13 @@ class SemaVisitor : public AST::BaseVisitor {
           // save the newly created function
           def->instantiated.push_back(new_def);
           resolveds = find_symbol(instantiated_name);
+          HIR::resolved_t new_ref = resolveds.empty() ? nullptr : resolveds[0];
+          pop_scope();
+          // re-store in generic's scope
+          store_symbol(instantiated_name, new_ref);
           current_scope_ = saved_scope;
         }
+        placeholder_map_.clear();
         //get info
         HIR::resolved_t ptr = resolveds.empty() ? nullptr : resolveds[0];
         HIR::datatype_t type = get_type(ptr);
@@ -2620,6 +2715,7 @@ class SemaVisitor : public AST::BaseVisitor {
         std::string underlying_name = node->s.substr(1);
         Scope::Resolveds try_again = find_symbol(underlying_name);
         if (!try_again.empty() && is_template(try_again[0])) {
+          // Dataframe will be made later by template
           resolveds = std::move(try_again);
         }
       }
@@ -2728,7 +2824,7 @@ class SemaVisitor : public AST::BaseVisitor {
           data_def->templates = ast_templates;
         }
         HIR::stmt_t new_def = visit(original);
-        // save the newly created item in the original scope
+        // save the newly created item
         template_def->instantiated.push_back(new_def);
         resolveds = find_symbol(instantiated_name);
         HIR::resolved_t new_ref = resolveds.empty() ? nullptr : resolveds[0];
@@ -2761,7 +2857,8 @@ class SemaVisitor : public AST::BaseVisitor {
     }
     // check that all types are the same
     HIR::datatype_t expected = !values.empty() ? values[0]->type : nullptr;
-    for (HIR::expr_t e: values) {
+    for (size_t i = 1; i < values.size(); i++) {
+      HIR::expr_t e = values[i];
       if (!is_same_type(e->type, expected)) {
         sema_err_ << "Error: mismtach in list: " << to_string(e->type)
                   << " vs " << to_string(expected) << std::endl;

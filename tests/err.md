@@ -123,3 +123,24 @@ Error: cannot assign D to a value
 Error: unable to determine type for D.age
 
 ```
+
+### Generics
+
+```
+>>> func gen_add[T](a: T, b: T) = a + b
+
+>>> gen_add(4, 5.)
+Error: argument type at position 1 does not match: Float64 vs T aka Int64
+
+>>> gen_add([1, 2], [3., 4.])
+Error: argument type at position 1 does not match: [Float64] vs T aka [Int64]
+
+>>> func gen_add2[T](a: [T], b: T) = a + b
+
+>>> gen_add2([1, 2, 3], [4, 5, 6])
+Error: argument type at position 1 does not match: [Int64] vs T aka Int64
+
+>>> gen_add2(4, 5)
+Error: argument type at position 0 does not match: Int64 vs [T]
+
+```

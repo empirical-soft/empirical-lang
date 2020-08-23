@@ -36,9 +36,9 @@ func String(x) => _repr(x, type_of(x))
 
 func print(x) => _print(String(x))
 
-func len(xs) => len(compile("xs." + members_of(xs)[0]))
+func len[T](xs: !T) => len(compile("xs." + members_of(xs)[0]))
 
-func reverse(df) -> type_of(df) => _reverse(df, type_of(df))
+func reverse[T](df: !T) -> type_of(df) => _reverse(df, type_of(df))
 )";
 
 const std::string empirical_help =
