@@ -45,6 +45,9 @@ class CodegenVisitor : public HIR::BaseVisitor {
       case HIR::datatype_::DatatypeKind::kTemplateType: {
         return "<template>";
       }
+      case HIR::datatype_::DatatypeKind::kPlaceholder: {
+        return "<placeholder>";
+      }
       case HIR::datatype_::DatatypeKind::kKind: {
         return "<type>";
       }
@@ -63,6 +66,7 @@ class CodegenVisitor : public HIR::BaseVisitor {
     switch (node->datatype_kind) {
       case HIR::datatype_::DatatypeKind::kFuncType:
       case HIR::datatype_::DatatypeKind::kTemplateType:
+      case HIR::datatype_::DatatypeKind::kPlaceholder:
       case HIR::datatype_::DatatypeKind::kKind:
       case HIR::datatype_::DatatypeKind::kVoid:
         return false;
@@ -1134,6 +1138,11 @@ class CodegenVisitor : public HIR::BaseVisitor {
 
   antlrcpp::Any visitTemplateType(HIR::TemplateType_t node) override {
     invalid("TemplateType");
+    return 0;
+  }
+
+  antlrcpp::Any visitPlaceholder(HIR::Placeholder_t node) override {
+    invalid("Placeholder");
     return 0;
   }
 

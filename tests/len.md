@@ -25,9 +25,25 @@ These tests cover `len()`.
 
 ```
 >>> len(5)
-Error: Index out of bounds
+Error: unable to match overloaded function len
+  candidate: ([Int64]) -> Int64
+    argument type at position 0 does not match: Int64 vs [Int64]
+  candidate: ([Float64]) -> Int64
+    argument type at position 0 does not match: Int64 vs [Float64]
+  candidate: ([Bool]) -> Int64
+    argument type at position 0 does not match: Int64 vs [Bool]
+  ...
+  <7 others>
 
 >>> len(Person("A", 1))
-Error: Index out of bounds
+Error: unable to match overloaded function len
+  candidate: ([Int64]) -> Int64
+    argument type at position 0 does not match: Person vs [Int64]
+  candidate: ([Float64]) -> Int64
+    argument type at position 0 does not match: Person vs [Float64]
+  candidate: ([Bool]) -> Int64
+    argument type at position 0 does not match: Person vs [Bool]
+  ...
+  <7 others>
 
 ```

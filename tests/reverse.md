@@ -27,10 +27,25 @@ These tests cover `reverse()`.
 
 ```
 >>> reverse(5)
-Error: Should have invoked internal_reverse() on $0
+Error: unable to match overloaded function reverse
+  candidate: ([Int64]) -> [Int64]
+    argument type at position 0 does not match: Int64 vs [Int64]
+  candidate: ([Float64]) -> [Float64]
+    argument type at position 0 does not match: Int64 vs [Float64]
+  candidate: ([Bool]) -> [Bool]
+    argument type at position 0 does not match: Int64 vs [Bool]
+  ...
+  <7 others>
 
 >>> reverse(Person("A", 1))
- name age
-    A   1
+Error: unable to match overloaded function reverse
+  candidate: ([Int64]) -> [Int64]
+    argument type at position 0 does not match: Person vs [Int64]
+  candidate: ([Float64]) -> [Float64]
+    argument type at position 0 does not match: Person vs [Float64]
+  candidate: ([Bool]) -> [Bool]
+    argument type at position 0 does not match: Person vs [Bool]
+  ...
+  <7 others>
 
 ```

@@ -11,7 +11,8 @@ module AST
                      declaration* args, stmt* body, expr? single,
                      bool force_inline, expr? explicit_rettype,
                      string? docstring)
-       | GenericDef(stmt original, declaration* args, expr? explicit_rettype)
+       | GenericDef(stmt original, declaration* placeholders,
+                    declaration* args, expr? explicit_rettype)
        | MacroDef(stmt original, declaration* args, expr? explicit_rettype)
        | TemplateDef(stmt original, declaration* templates)
        | DataDef(identifier name, declaration* templates, declaration* body,
