@@ -89,7 +89,7 @@ module HIR
   compmode = Normal | Stream | Comptime
 
   datatype = VVMType(size_t t)
-           | UDT(identifier s, resolved ref)
+           | UDT(identifier s, stmt def, stmt? underlying)
            | Array(datatype type)
            | FuncType(datatype* argtypes, datatype rettype, size_t traits)
            | TemplateType(datatype* types)
@@ -102,7 +102,7 @@ module HIR
            | GenericRef(stmt ref)
            | MacroRef(stmt ref)
            | TemplateRef(stmt ref)
-           | DataRef(stmt ref)
+           | DataRef(datatype udt)
            | ModRef(mod ref)
            | VVMOpRef(size_t opcode, datatype type)
            | VVMTypeRef(size_t t)

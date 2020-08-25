@@ -246,7 +246,9 @@ class SemaVisitor : public AST::BaseVisitor {
       if (!is_dataframe_type(type)) {
         return false;
       }
-      type = get_underlying_udt(to_string(type));
+      HIR::UDT_t udt = dynamic_cast<HIR::UDT_t>(type);
+      HIR::DataDef_t dd = dynamic_cast<HIR::DataDef_t>(udt->underlying);
+      type = HIR::UDT(dd->name, dd, nullptr);
     }
 
     // set or compare the type
@@ -292,8 +294,7 @@ class SemaVisitor : public AST::BaseVisitor {
       }
       case HIR::resolved_::ResolvedKind::kDataRef: {
         HIR::DataRef_t dr = dynamic_cast<HIR::DataRef_t>(node);
-        HIR::DataDef_t dd = dynamic_cast<HIR::DataDef_t>(dr->ref);
-        return HIR::Kind(HIR::UDT(dd->name, node));
+        return HIR::Kind(dr->udt);
       }
       case HIR::resolved_::ResolvedKind::kModRef: {
         return nullptr;
@@ -436,8 +437,7 @@ class SemaVisitor : public AST::BaseVisitor {
     switch (node->resolved_kind) {
       case HIR::resolved_::ResolvedKind::kDataRef: {
         HIR::DataRef_t dr = dynamic_cast<HIR::DataRef_t>(node);
-        HIR::DataDef_t dd = dynamic_cast<HIR::DataDef_t>(dr->ref);
-        scope = dd->scope;
+        scope = get_scope(dr->udt);
         break;
       }
       default:
@@ -455,7 +455,8 @@ class SemaVisitor : public AST::BaseVisitor {
     switch (node->datatype_kind) {
       case HIR::datatype_::DatatypeKind::kUDT: {
         HIR::UDT_t udt = dynamic_cast<HIR::UDT_t>(node);
-        scope = get_scope(udt->ref);
+        HIR::DataDef_t dd = dynamic_cast<HIR::DataDef_t>(udt->def);
+        scope = dd->scope;
         break;
       }
       default:
@@ -464,7 +465,7 @@ class SemaVisitor : public AST::BaseVisitor {
     return scope;
   }
 
-  // get underlying data definition from a user-defined type
+  // get data definition from a user-defined type
   HIR::DataDef_t get_data_def(HIR::datatype_t node) {
     if (node == nullptr) {
       return nullptr;
@@ -472,9 +473,23 @@ class SemaVisitor : public AST::BaseVisitor {
     switch (node->datatype_kind) {
       case HIR::datatype_::DatatypeKind::kUDT: {
         HIR::UDT_t udt = dynamic_cast<HIR::UDT_t>(node);
-        HIR::DataRef_t dr = dynamic_cast<HIR::DataRef_t>(udt->ref);
-        HIR::DataDef_t dd = dynamic_cast<HIR::DataDef_t>(dr->ref);
+        HIR::DataDef_t dd = dynamic_cast<HIR::DataDef_t>(udt->def);
         return dd;
+      }
+      default:
+        return nullptr;
+    }
+  }
+
+  // get data definition from a user-defined type ref
+  HIR::DataDef_t get_data_def(HIR::resolved_t node) {
+    if (node == nullptr) {
+      return nullptr;
+    }
+    switch (node->resolved_kind) {
+      case HIR::resolved_::ResolvedKind::kDataRef: {
+        HIR::DataRef_t dr = dynamic_cast<HIR::DataRef_t>(node);
+        return get_data_def(dr->udt);
       }
       default:
         return nullptr;
@@ -888,7 +903,39 @@ class SemaVisitor : public AST::BaseVisitor {
     return nullptr;
   }
 
-  // attempt to make Dataframe with the given type name
+  // make Dataframe from a user-defined type
+  HIR::datatype_t make_dataframe(HIR::DataDef_t node,
+                                 const std::string& name = "") {
+    // for templates and placeholders, the stored name will be different
+    // from the name of the underlying type
+    std::string full_name = '!' + node->name;
+    std::string store_name = name.empty() ? full_name : name;
+
+    // vectorize all entries
+    std::vector<HIR::declaration_t> body;
+    push_scope();
+    size_t scope = current_scope_;
+    for (HIR::declaration_t b: node->body) {
+      auto d =
+        HIR::declaration(b->name, nullptr, b->value, false, b->dt,
+                         HIR::Array(b->type), empty_traits,
+                         HIR::compmode_t::kNormal, nullptr, b->offset,
+                         false);
+      store_symbol(b->name, HIR::DeclRef(d));
+      body.push_back(d);
+    }
+    pop_scope();
+    HIR::expr_t single = nullptr;
+    HIR::stmt_t new_node = HIR::DataDef(full_name, node->templates, body,
+                                        single, scope);
+
+    // put everything together
+    HIR::datatype_t dt = HIR::UDT(full_name, new_node, node);
+    store_symbol(store_name, HIR::DataRef(dt));
+    return dt;
+  }
+
+  // attempt to make Dataframe with the given type name (assumes leading '!')
   HIR::datatype_t make_dataframe(const std::string& name) {
     // find underlying data definition first
     HIR::DataDef_t node = get_data_def(get_underlying_udt(name));
@@ -896,41 +943,19 @@ class SemaVisitor : public AST::BaseVisitor {
       return nullptr;
     }
 
-    // use the template's resolved name since it will be different
-    std::string full_name = '!' + node->name;
-
     // see if the Dataframe already exists
-    HIR::resolved_t ref = nullptr;
     Scope::Resolveds resolveds = find_symbol(name);
     if (resolveds.size() != 0) {
       // ensure underlying hasn't changed
-      ref = resolveds[0];
-      if (!is_dataframe_type_valid(node, ref)) {
-        ref = nullptr;
+      HIR::resolved_t ref = resolveds[0];
+      if (is_dataframe_type_valid(node, ref)) {
+        std::string full_name = '!' + node->name;
+        HIR::stmt_t new_node = get_data_def(ref);
+        return HIR::UDT(full_name, new_node, node);
       }
     }
-    if (ref == nullptr) {
-      // make Dataframe definition
-      std::vector<HIR::declaration_t> body;
-      push_scope();
-      size_t scope = current_scope_;
-      for (HIR::declaration_t b: node->body) {
-        auto d =
-          HIR::declaration(b->name, nullptr, b->value, false, b->dt,
-                           HIR::Array(b->type), empty_traits,
-                           HIR::compmode_t::kNormal, nullptr, b->offset,
-                           false);
-        store_symbol(b->name, HIR::DeclRef(d));
-        body.push_back(d);
-      }
-      pop_scope();
-      HIR::expr_t single = nullptr;
-      HIR::stmt_t new_node = HIR::DataDef(full_name, node->templates, body,
-                                          single, scope);
-      ref = HIR::DataRef(new_node);
-      store_symbol(name, ref);
-    }
-    return HIR::UDT(full_name, ref);
+
+    return make_dataframe(node, name);
   }
 
   bool is_string_type(HIR::datatype_t node) {
@@ -1357,15 +1382,15 @@ class SemaVisitor : public AST::BaseVisitor {
   }
 
   // return HIR node for a type definition string
-  HIR::stmt_t create_datatype(const std::string& type_name,
-                              const std::string& type_def) {
-    std::string data_str = "data Anon: " + type_def + " end";
+  HIR::DataDef_t create_datatype(const std::string& type_def,
+                                 const std::string& type_name = "") {
+    std::string name = type_name.empty() ? anon_data_name() : type_name;
+    std::string data_str = "data " + name + ": " + type_def + " end";
     AST::mod_t ast = parse(data_str, false, false);
     AST::Module_t mod = dynamic_cast<AST::Module_t>(ast);
     AST::stmt_t parsed = mod->body[0];
-    AST::DataDef_t dd = dynamic_cast<AST::DataDef_t>(parsed);
-    dd->name = type_name;
-    return visit(parsed);
+    HIR::stmt_t result = visit(parsed);
+    return dynamic_cast<HIR::DataDef_t>(result);
   }
 
   // return a type definition string from aliases
@@ -1944,8 +1969,8 @@ class SemaVisitor : public AST::BaseVisitor {
     HIR::expr_t single = nullptr;
     HIR::stmt_t new_node = HIR::DataDef(node->name, templates, body, single,
                                         0);
-    HIR::DataDef_t dd = dynamic_cast<HIR::DataDef_t>(new_node);
-    HIR::resolved_t ref = HIR::DataRef(new_node);
+    HIR::datatype_t udt = HIR::UDT(node->name, new_node, nullptr);
+    HIR::resolved_t ref = HIR::DataRef(udt);
     // store name in current scope
     if (!store_symbol(node->name, ref)) {
       sema_err_ << "Error: symbol " << node->name
@@ -1980,6 +2005,7 @@ class SemaVisitor : public AST::BaseVisitor {
     }
     pop_scope();
     // put everything together
+    HIR::DataDef_t dd = dynamic_cast<HIR::DataDef_t>(new_node);
     dd->templates = templates;
     dd->body = body;
     dd->single = single;
@@ -2133,9 +2159,7 @@ class SemaVisitor : public AST::BaseVisitor {
     HIR::datatype_t by_type = nullptr;
     if (!by.empty()) {
       std::string ts = get_type_string(by);
-      std::string by_name = anon_data_name();
-      (void) create_datatype(by_name, ts);
-      by_type = make_dataframe('!' + by_name);
+      by_type = make_dataframe(create_datatype(ts));
     }
 
     // 'cols' change the resulting type
@@ -2155,9 +2179,7 @@ class SemaVisitor : public AST::BaseVisitor {
     if (!cols.empty()) {
       std::string byts = by.empty() ? "" : get_type_string(by) + ", ";
       std::string ts = byts + get_type_string(cols);
-      std::string type_name = anon_data_name();
-      (void) create_datatype(type_name, ts);
-      type = make_dataframe('!' + type_name);
+      type = make_dataframe(create_datatype(ts));
     } else {
       if (!by.empty()) {
         sema_err_ << "Error: must express aggregation if 'by' is listed"
@@ -2213,9 +2235,7 @@ class SemaVisitor : public AST::BaseVisitor {
 
     // type of 'by' items is its own Dataframe
     std::string ts = get_type_string(by);
-    std::string by_name = anon_data_name();
-    (void) create_datatype(by_name, ts);
-    HIR::datatype_t by_type = make_dataframe('!' + by_name);
+    HIR::datatype_t by_type = make_dataframe(create_datatype(ts));
 
     // traits and mode
     std::vector<HIR::expr_t> exprs = {table};
@@ -2265,15 +2285,11 @@ class SemaVisitor : public AST::BaseVisitor {
 
       // type of 'left_on' items is its own Dataframe
       std::string left_ts = get_type_string(left_on);
-      std::string left_name = anon_data_name();
-      (void) create_datatype(left_name, left_ts);
-      left_on_type = make_dataframe('!' + left_name);
+      left_on_type = make_dataframe(create_datatype(left_ts));
 
       // type of 'right_on' items is its own Dataframe
       std::string right_ts = get_type_string(right_on);
-      std::string right_name = anon_data_name();
-      (void) create_datatype(right_name, right_ts);
-      right_on_type = make_dataframe('!' + right_name);
+      right_on_type = make_dataframe(create_datatype(right_ts));
 
       // ensure that the 'on' types are the same
       if (!is_same_type(left_on_type, right_on_type)) {
@@ -2364,18 +2380,14 @@ class SemaVisitor : public AST::BaseVisitor {
     std::string remaining_ts;
     if (!bad_dfs) {
       remaining_ts = drop_columns(right->type, right_on_type, right_asof_name);
-      std::string remaining_name = anon_data_name();
-      (void) create_datatype(remaining_name, remaining_ts);
-      remaining_type = make_dataframe('!' + remaining_name);
+      remaining_type = make_dataframe(create_datatype(remaining_ts));
     }
 
     // combine left's type and right's remaining type
     HIR::datatype_t full_type = nullptr;
     if (!bad_dfs) {
       std::string full_ts = get_type_string(left->type) + ", " + remaining_ts;
-      std::string full_name = anon_data_name();
-      (void) create_datatype(full_name, full_ts);
-      full_type = make_dataframe('!' + full_name);
+      full_type = make_dataframe(create_datatype(full_ts));
     }
 
     // traits and mode
@@ -2838,8 +2850,9 @@ class SemaVisitor : public AST::BaseVisitor {
     HIR::resolved_t ptr = resolveds.empty() ? nullptr : resolveds[0];
     if (dataframe) {
       instantiated_name = '!' + instantiated_name;
-      HIR::datatype_t dt = make_dataframe(instantiated_name);
-      ptr = dynamic_cast<HIR::UDT_t>(dt)->ref;
+      (void) make_dataframe(instantiated_name);
+      resolveds = find_symbol(instantiated_name);
+      ptr = resolveds.empty() ? nullptr : resolveds[0];
     }
     HIR::datatype_t type = get_type(ptr);
     Traits traits = get_traits(ptr);
@@ -2896,12 +2909,8 @@ class SemaVisitor : public AST::BaseVisitor {
     HIR::stmt_t s = visit(named_def);
     HIR::DataDef_t new_def = dynamic_cast<HIR::DataDef_t>(s);
 
-    // construct type of expr
-    Scope::Resolveds resolveds = find_symbol(name);
-    HIR::resolved_t ref = resolveds.empty() ? nullptr : resolveds[0];
-    HIR::datatype_t type = HIR::Kind(HIR::UDT(name, ref));
-
     // put it all together
+    HIR::datatype_t type = HIR::Kind(HIR::UDT(name, new_def, nullptr));
     return HIR::AnonData(new_def->body, new_def->scope, type, all_traits,
                          HIR::compmode_t::kComptime, name);
   }

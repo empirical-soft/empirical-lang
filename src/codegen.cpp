@@ -30,8 +30,7 @@ class CodegenVisitor : public HIR::BaseVisitor {
       }
       case HIR::datatype_::DatatypeKind::kUDT: {
         HIR::UDT_t udt = dynamic_cast<HIR::UDT_t>(node);
-        HIR::DataRef_t dr = dynamic_cast<HIR::DataRef_t>(udt->ref);
-        HIR::DataDef_t dd = dynamic_cast<HIR::DataDef_t>(dr->ref);
+        HIR::DataDef_t dd = dynamic_cast<HIR::DataDef_t>(udt->def);
         VVM::type_t typee = type_map_get(dd);
         return VVM::decode_type(typee);
       }
@@ -115,8 +114,7 @@ class CodegenVisitor : public HIR::BaseVisitor {
       return 0;
     }
     HIR::UDT_t udt = dynamic_cast<HIR::UDT_t>(node);
-    HIR::DataRef_t dr = dynamic_cast<HIR::DataRef_t>(udt->ref);
-    HIR::DataDef_t dd = dynamic_cast<HIR::DataDef_t>(dr->ref);
+    HIR::DataDef_t dd = dynamic_cast<HIR::DataDef_t>(udt->def);
     return dd->body.size();
   }
 
@@ -1051,7 +1049,8 @@ class CodegenVisitor : public HIR::BaseVisitor {
     std::vector<HIR::declaration_t> templates;
     HIR::stmt_t stmt = HIR::DataDef("", templates, node->body, nullptr,
                                     node->scope);
-    return visit(HIR::DataRef(stmt));
+    HIR::datatype_t udt = HIR::UDT("", stmt, nullptr);
+    return get_type_operand(udt);
   }
 
   antlrcpp::Any visitSlice(HIR::Slice_t node) override {
@@ -1191,7 +1190,7 @@ class CodegenVisitor : public HIR::BaseVisitor {
   }
 
   antlrcpp::Any visitDataRef(HIR::DataRef_t node) override {
-    return get_type_operand(HIR::UDT("", node));
+    return get_type_operand(node->udt);
   }
 
   antlrcpp::Any visitModRef(HIR::ModRef_t node) override {

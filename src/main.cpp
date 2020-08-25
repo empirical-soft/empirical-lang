@@ -30,15 +30,15 @@ func csv_load{T}(filename: String) -> !T => _csv_load(filename, !T)
 
 func load($ filename: String) => csv_load{CsvProvider{filename}}(filename)
 
-func store(df, filename: String) => _csv_store(type_of(df), df, filename)
+func store[T](df: !T, filename: String) => _csv_store(!T, df, filename)
 
 func String(x) => _repr(x, type_of(x))
 
 func print(x) => _print(String(x))
 
-func len[T](xs: !T) => len(compile("xs." + members_of(xs)[0]))
+func len[T](df: !T) => len(compile("df." + members_of(df)[0]))
 
-func reverse[T](df: !T) -> type_of(df) => _reverse(df, type_of(df))
+func reverse[T](df: !T) -> !T => _reverse(df, !T)
 )";
 
 const std::string empirical_help =
