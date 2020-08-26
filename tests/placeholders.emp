@@ -26,3 +26,25 @@ func foo3[T, U](a: T, b: U) = a + b
 print(foo3(4, 5.))
 ##9.0
 
+
+# check overloads
+func baz[T](a: T, b: T) = a * b
+
+func baz[T](a: [T], b: T) = a + b
+
+func baz(a: Float64, b: Float64) = a / b
+
+func baz(a: Char, b: Char) = Int64(a) - Int64(b)
+
+print(baz(3, 4))
+##12
+
+print(baz([1, 2, 3], 4))
+##[5, 6, 7]
+
+print(baz(3.0, 4.0))
+##0.75
+
+print(baz('3', '4'))
+##-1
+

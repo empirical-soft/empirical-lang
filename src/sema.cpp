@@ -240,6 +240,17 @@ class SemaVisitor : public AST::BaseVisitor {
   // set a placeholder with the specific type
   bool instantiate_placeholder(HIR::Placeholder_t place,
                                HIR::datatype_t type) {
+    // comparing placeholders means comparing their structure
+    if (is_placeholder(type)) {
+      HIR::Placeholder_t right = dynamic_cast<HIR::Placeholder_t>(type);
+      // only T vs T or !T vs !T allowed
+      return ((place->name[0] == '!') == (right->name[0] == '!'));
+    }
+    if (is_array_type(type) && is_placeholder(get_underlying_type(type))) {
+      // type was [T], which doesn't match our structure of either T or !T
+      return false;
+    }
+
     // check for Dataframes; we will store the underlying against place's
     // unique, which will then allow make_dataframe() to build
     if (place->name[0] == '!') {
@@ -783,13 +794,11 @@ class SemaVisitor : public AST::BaseVisitor {
     if (left == nullptr || right == nullptr) {
       return true;
     }
-    if (right->datatype_kind ==
-        HIR::datatype_::DatatypeKind::kPlaceholder) {
+    if (is_placeholder(right)) {
       // this way we only have to worry about the left as generic
       std::swap(left, right);
     }
-    if (left->datatype_kind !=
-        HIR::datatype_::DatatypeKind::kPlaceholder &&
+    if (!is_placeholder(left) &&
         left->datatype_kind != right->datatype_kind) {
       return false;
     }
@@ -1162,6 +1171,11 @@ class SemaVisitor : public AST::BaseVisitor {
   bool is_slice(HIR::slice_t node) {
     return (node != nullptr &&
             node->slice_kind == HIR::slice_::SliceKind::kSlice);
+  }
+
+  bool is_placeholder(HIR::datatype_t node) {
+    return (node != nullptr &&
+            node->datatype_kind == HIR::datatype_::DatatypeKind::kPlaceholder);
   }
 
   bool is_kind_type(HIR::datatype_t node) {
