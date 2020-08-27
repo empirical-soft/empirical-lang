@@ -30,6 +30,10 @@ func csv_load{T}(filename: String) -> !T => _csv_load(filename, !T)
 
 func load($ filename: String) => csv_load{CsvProvider{filename}}(filename)
 
+func stream_csv_load{T}(filename: String) -> !T => _stream_csv_load(filename, !T)
+
+func stream_load($ filename: String) => stream_csv_load{CsvProvider{filename}}(filename)
+
 func store[T](df: !T, filename: String) => _csv_store(!T, df, filename)
 
 func String(x) => _repr(x, type_of(x))

@@ -660,6 +660,14 @@ WRAPPER_V_V(reverse)
     y = loader(src, typee >> 2);
   }
 
+  // streaming load operation -- TODO currently a stub
+  void stream_load(operand_t src, operand_t typee, operand_t dst) {
+    verify_is_type(typee);
+    Dataframe& y = get_reference<Dataframe>(dst);
+    y = loader(src, typee >> 2);
+  }
+
+
   /*** STORE ***/
 
   // store data to a file

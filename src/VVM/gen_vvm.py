@@ -276,6 +276,7 @@ def _make_opcodes():
     opcodes += [("_reverse", "reverse", "(Value,Kind)->Value", 3)]
 
     # operators on CSV files
+    opcodes += [("_stream_csv_load", "stream_load", "(String,Kind)->Value", 3)]
     opcodes += [("_csv_load", "load", "(String,Kind)->Value", 3)]
     opcodes += [("_csv_store", "store", "(Kind,Value,String)->()", 4)]
     opcodes += [("_csv_infer", "csv_infer", "String->String", 2)]
@@ -522,7 +523,8 @@ class BuiltinsWriter(HeaderWriter):
         for o in opcodes:
             if len(o[0]) != 0:
                 traits = all_traits
-                d = {'_csv_load': io_traits | autostream,
+                d = {'_stream_csv_load': io_traits | autostream,
+                     '_csv_load': io_traits,
                      '_csv_store': none,
                      '_print': none,
                      'unique': ca_traits,
