@@ -210,18 +210,55 @@ transform, linear
 none
 
 >>> mode_of(prices)
-Stream
+Normal
 
 >>> mode_of(prices.volume)
-Stream
+Normal
 
 >>> mode_of(prices.volume[0])
 Normal
 
 >>> mode_of(prices.volume + 1)
-Stream
+Normal
 
 >>> mode_of(print(prices.volume + 1))
+Normal
+
+```
+
+### Streaming Dataframe
+
+```
+>>> let stream_prices = stream_load("sample_csv/prices.csv")
+
+>>> traits_of(stream_prices)
+transform, linear
+
+>>> traits_of(stream_prices.volume)
+transform, linear
+
+>>> traits_of(stream_prices.volume[0])
+transform
+
+>>> traits_of(stream_prices.volume + 1)
+transform, linear
+
+>>> traits_of(print(stream_prices.volume + 1))
+none
+
+>>> mode_of(stream_prices)
+Stream
+
+>>> mode_of(stream_prices.volume)
+Stream
+
+>>> mode_of(stream_prices.volume[0])
+Normal
+
+>>> mode_of(stream_prices.volume + 1)
+Stream
+
+>>> mode_of(print(stream_prices.volume + 1))
 Normal
 
 ```
@@ -229,10 +266,10 @@ Normal
 ### Table syntax
 
 ```
->>> mode_of(from prices select sum(volume) by symbol)
+>>> mode_of(from stream_prices select sum(volume) by symbol)
 Stream
 
->>> mode_of(sort prices by volume)
+>>> mode_of(sort stream_prices by volume)
 Normal
 
 ```
