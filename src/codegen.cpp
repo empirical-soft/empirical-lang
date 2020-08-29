@@ -251,6 +251,21 @@ class CodegenVisitor : public HIR::BaseVisitor {
     return VVM::encode_opcode(opstr);
   }
 
+  /* streaming */
+
+  bool run_stream_;
+
+  // set of declarations that were assigned a VVM register during a stream
+  std::unordered_set<HIR::declaration_t> streaming_registers_;
+
+  // reset streaming registers; do this after every stream
+  void clear_streaming_registers() {
+    for (HIR::declaration_t r: streaming_registers_) {
+      reg_map_.erase(reg_map_.find(r));
+    }
+    streaming_registers_.clear();
+  }
+
   /* miscellaneous */
 
   bool interactive_;
@@ -279,27 +294,30 @@ class CodegenVisitor : public HIR::BaseVisitor {
 
   antlrcpp::Any visitModule(HIR::Module_t node) override {
     // reset our state
+    run_stream_ = true;
     directed_repr_ = false;
     types_.clear();
     constants_.clear();
     instructions_.clear();
     labeler_.clear();
     // iteratively scan statements
+    HIR::stmt_t last_stmt = nullptr;
     VVM::operand_t last_stmt_value;
     for (HIR::stmt_t s: node->body) {
       VVM::operand_t op = visit(s);
+      last_stmt = s;
       last_stmt_value = op;
+      clear_streaming_registers();
     }
     // if last stmt is a non-void expr, then display its value
-    if (interactive_ && !node->body.empty()) {
+    if (interactive_ && last_stmt != nullptr) {
       if (!directed_repr_) {
-        auto last_stmt = node->body.back();
         if (last_stmt->stmt_kind == HIR::stmt_::StmtKind::kExpr) {
           HIR::Expr_t e = dynamic_cast<HIR::Expr_t>(last_stmt);
           std::string name = e->value->name;
           HIR::datatype_t dt = e->value->type;
-          VVM::operand_t repr_value;
           if (!is_void_type(dt)) {
+            VVM::operand_t repr_value;
             if (is_func_type(dt)) {
               name = std::isalpha(name[0]) ? name : ("(" + name + ")");
               repr_value = direct_repr("<func: " + name + ">");
@@ -495,8 +513,11 @@ class CodegenVisitor : public HIR::BaseVisitor {
 
   antlrcpp::Any visitDecl(HIR::Decl_t node) override {
     for (auto d: node->decls) {
+      // streaming declarations are deferred until forced
+      run_stream_ = false;
       visit(d);
     }
+    run_stream_ = true;
     return VVM::operand_t(0);
   }
 
@@ -1075,6 +1096,11 @@ class CodegenVisitor : public HIR::BaseVisitor {
       return VVM::operand_t(0);
     }
 
+    // defer if this is a stream
+    if (node->mode == HIR::compmode_t::kStream && !run_stream_) {
+      return VVM::operand_t(0);
+    }
+
     // reserve some space
     const VVM::OpMask mask = node->is_global ? VVM::OpMask::kGlobal
                                              : VVM::OpMask::kLocal;
@@ -1083,7 +1109,16 @@ class CodegenVisitor : public HIR::BaseVisitor {
     VVM::operand_t typee = get_type_operand(node->type);
     emit(VVM::opcodes::alloc, {typee, target});
 
-    // assign the value
+    // save streaming regsiter
+    if (node->mode == HIR::compmode_t::kStream) {
+      streaming_registers_.insert(node);
+      // TODO notes for the streaming loop, to be added after chunking:
+      // if set is currently empty, then this node is the bottom of the loop
+      // if set doesn't grow after below assignment, node is top of loop
+    }
+
+    // assign the value; force any streaming dependencies
+    run_stream_ = true;
     if (node->comptime_literal != nullptr) {
       VVM::operand_t value = visit(node->comptime_literal);
       emit(VVM::opcodes::assign, {value, typee, target});
@@ -1162,6 +1197,7 @@ class CodegenVisitor : public HIR::BaseVisitor {
         decl->comptime_literal != nullptr) {
       return visit(decl->comptime_literal);
     }
+
     // return register or make it on demand
     auto iter = reg_map_.find(decl);
     return (iter != reg_map_.end()) ? iter->second
