@@ -10,7 +10,7 @@ pure, transform, linear
 none
 
 >>> traits_of(range)
-pure, transform, linear, autostream
+pure, transform, linear
 
 >>> traits_of(range(5))
 pure, transform, linear
@@ -22,7 +22,7 @@ Comptime
 Normal
 
 >>> mode_of(range(5))
-Stream
+Comptime
 
 ```
 
