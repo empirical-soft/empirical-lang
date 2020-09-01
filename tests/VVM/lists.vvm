@@ -5,7 +5,7 @@ append 2 i64s %1
 append 3 i64s %1
 
 ; sum and print
-sum_i64v %1 %2
+sum_i64v *0 %1 %2
 repr %2 i64s %3
 write %3
 

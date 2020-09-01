@@ -35,7 +35,7 @@ DEF : 'def';
 END : 'end';
 
 IDENTIFIER : [a-zA-Z] [a-zA-Z0-9_]*;
-REGISTER   : [%@] INT;
+REGISTER   : [%@*] INT;
 UDT        : '$' INT;
 
 EOL     : [\r\n]+;

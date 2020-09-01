@@ -137,6 +137,16 @@ void verify_user_defined(type_t typee) {
   }
 }
 
+// extract the mask from an opereand
+OpMask get_operand_mask(operand_t op) {
+  return OpMask(op & 7);
+}
+
+// get the standalone number from an operand
+size_t get_operand_value(operand_t op) {
+  return op >> 3;
+}
+
 // convert an operand string into its numerical form
 operand_t encode_operand(const std::string& s) {
   // set mask and convert string to number
@@ -151,31 +161,34 @@ operand_t encode_operand(const std::string& s) {
   } else if (s[0] == '@') {
     result = std::stol(&s[1]);
     mask = OpMask::kGlobal;
+  } else if (s[0] == '*') {
+    result = std::stol(&s[1]);
+    mask = OpMask::kState;
   } else {
     result = encode_type(s);
     mask = OpMask::kType;
   }
   // make sure the resulting number can handle tagging
-  if (!is_small_int(result, 2)) {
+  if (!is_small_int(result, 3)) {
     std::ostringstream oss;
     oss << "Operand " <<  result << " is too large to be respresented with "
         << sizeof(operand_t) << " bytes";
     throw std::logic_error(oss.str());
   }
   // tag the number
-  return (result << 2) | operand_t(mask);
+  return (result << 3) | operand_t(mask);
 }
 
 // convert a stand-alone number to a proper operand
 operand_t encode_operand(size_t s, OpMask mask) {
   operand_t op = s;
-  return (op << 2) | operand_t(mask);
+  return (op << 3) | operand_t(mask);
 }
 
 // string-ify an operand
 std::string decode_operand(operand_t op) {
-  OpMask mask = OpMask(op & 3);
-  operand_t num = op >> 2;
+  OpMask mask = get_operand_mask(op);
+  size_t num = get_operand_value(op);
   switch (mask) {
     case OpMask::kImmediate:
       return std::to_string(num);
@@ -183,14 +196,16 @@ std::string decode_operand(operand_t op) {
       return "%" + std::to_string(num);
     case OpMask::kGlobal:
       return "@" + std::to_string(num);
+    case OpMask::kState:
+      return "*" + std::to_string(num);
     case OpMask::kType:
-      return decode_type(num);
+      return decode_type(type_t(num));
   }
 }
 
 // helper to ensure that an operand is actually a type
 void verify_is_type(operand_t typee) {
-  OpMask mask = OpMask(typee & 3);
+  OpMask mask = get_operand_mask(typee);
   if (mask != OpMask::kType) {
     std::string msg = "Was expecting type but got " + decode_operand(typee);
     throw std::logic_error(msg);

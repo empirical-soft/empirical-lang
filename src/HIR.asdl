@@ -104,7 +104,7 @@ module HIR
            | TemplateRef(stmt ref)
            | DataRef(datatype udt)
            | ModRef(mod ref)
-           | VVMOpRef(size_t opcode, datatype type)
+           | VVMOpRef(size_t opcode, datatype type, bool takes_state)
            | VVMTypeRef(size_t t)
            | SemaFuncRef(size_t code, datatype type)
            | SemaTypeRef(datatype type)
