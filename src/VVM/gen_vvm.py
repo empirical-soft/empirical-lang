@@ -245,14 +245,19 @@ def _make_opcodes():
         opcodes += [('suffix' + u, 'unit_' + u, 'Int64->Timedelta', 2)]
 
     # wrappers
-    operators = [('len', 'len'), ('count', 'count')]
-    for k, v in operators:
-        for t in all_types:
-            opcodes += [(v, k, '[%s]->Int64' % t, 2)]
     operators = [('range', 'range')]
     for k, v in operators:
         for t in integer_types:
             opcodes += [(v, k, '%s->[%s]' % (t, t), 2)]
+    operators = [('len', 'len'), ('count', 'count')]
+    for k, v in operators:
+        for t in all_types:
+            opcodes += [(v, k, '[%s]->Int64' % t, 2)]
+    operators = [('mean', 'mean'), ('variance', 'variance'),
+                 ('stddev', 'stddev')]
+    for k, v in operators:
+        for t in arithmetic_types:
+            opcodes += [(v, k, '[%s]->Float64' % t, 2)]
     operators = [('reverse', 'reverse')]
     for k, v in operators:
         for t in all_types:
