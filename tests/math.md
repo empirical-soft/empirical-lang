@@ -47,3 +47,37 @@ These tests cover mathematical functions.
 [0.0, 1.0]
 
 ```
+
+### Statistics
+
+```
+>>> var empty: [Int64]
+
+>>> mean([1, 2, 3])
+2.0
+
+>>> mean([1, 2, nil])
+1.5
+
+>>> mean(empty)
+nan
+
+>>> variance([1, 2 ,3])
+0.666667
+
+>>> variance([1, 2, nil])
+0.25
+
+>>> variance(empty)
+nan
+
+>>> stddev([1, 2, 3])
+0.816497
+
+>>> stddev([1, 2, nil])
+0.5
+
+>>> stddev(empty)
+nan
+
+```

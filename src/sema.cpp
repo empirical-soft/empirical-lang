@@ -3057,6 +3057,11 @@ class SemaVisitor : public AST::BaseVisitor {
   void set_interactive(bool b) {
     interactive_ = b;
   }
+
+  // needed when a user error occurs in the REPL
+  void reset_scope() {
+    current_scope_ = 0;
+  }
 } sema_visitor;
 
 
@@ -3064,9 +3069,17 @@ class SemaVisitor : public AST::BaseVisitor {
 HIR::mod_t sema(AST::mod_t ast, bool interactive, bool dump_hir) {
   // build high-level IR
   sema_visitor.set_interactive(interactive);
-  HIR::mod_t hir = sema_visitor.visit(ast);
-  std::string msg = sema_visitor.get_errors();
+  HIR::mod_t hir;
+  std::string msg;
+  try {
+    hir = sema_visitor.visit(ast).as<decltype(hir)>();
+    msg = sema_visitor.get_errors();
+  }
+  catch (std::exception& e) {
+    msg = e.what();
+  }
   if (!msg.empty()) {
+    sema_visitor.reset_scope();
     throw std::logic_error(msg);
   }
 

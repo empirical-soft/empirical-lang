@@ -377,7 +377,7 @@ UNIT(d,86400000000000)
 
 #undef UNIT
 
-  // iota
+  // range()
   template<class T>
   std::vector<T> internal_range(T n) {
     std::vector<T> xs(n);
@@ -385,13 +385,13 @@ UNIT(d,86400000000000)
     return xs;
   }
 
-  // total number of elements
+  // len()
   template<class T>
   int64_t internal_len(const std::vector<T>& xs) {
     return xs.size();
   }
 
-  // number of non-nil elements
+  // count()
   template<class T>
   int64_t internal_count(const std::vector<T>& xs) {
     int64_t result = 0;
@@ -403,13 +403,62 @@ UNIT(d,86400000000000)
     return result;
   }
 
-  // invert all elements
+  // mean()
+  template<class T>
+  double internal_mean(const std::vector<T>& xs) {
+    if (xs.empty()) {
+      return nil_value<double>();
+    }
+
+    double sum = 0.0;
+    int64_t count = 0;
+    for (auto x: xs) {
+      if (!is_nil(x)) {
+        sum += x;
+        count++;
+      }
+    }
+    return sum / count;
+  }
+
+  // variance()
+  template<class T>
+  double internal_variance(const std::vector<T>& xs) {
+    if (xs.empty()) {
+      return nil_value<double>();
+    }
+
+    double mean = internal_mean(xs);
+    double sum = 0.0;
+    int64_t count = 0;
+    for (auto x: xs) {
+      if (!is_nil(x)) {
+        double diff = x - mean;
+        sum += diff * diff;
+        count++;
+      }
+    }
+    return sum / count;
+  }
+
+  // stddev()
+  template<class T>
+  double internal_stddev(const std::vector<T>& xs) {
+    if (xs.empty()) {
+      return nil_value<double>();
+    }
+
+    return std::sqrt(internal_variance(xs));
+  }
+
+  // reverse()
   template<class T>
   std::vector<T> internal_reverse(const std::vector<T>& xs) {
     std::vector<T> result(xs.size());
     std::reverse_copy(xs.begin(), xs.end(), result.begin());
     return result;
   }
+
 
 #define WRAPPER_S_V(FUNC) template<class T, class U>\
 void FUNC##_s(operand_t left, operand_t result) {\
@@ -435,6 +484,9 @@ void FUNC##_v(operand_t left, operand_t result) {\
 WRAPPER_S_V(range)
 WRAPPER_V_S(len)
 WRAPPER_V_S(count)
+WRAPPER_V_S(mean)
+WRAPPER_V_S(variance)
+WRAPPER_V_S(stddev)
 WRAPPER_V_V(reverse)
 
 #undef WRAPPER_S_V
