@@ -888,9 +888,6 @@ class CodegenVisitor : public HIR::BaseVisitor {
       size_t opcode = ptr->opcode;
       result = reserve_space();
       params.push_back(result);
-      if (ptr->takes_state) {
-        params.insert(params.begin(), reserve_space(VVM::OpMask::kState));
-      }
       emit(opcode, params);
     } else if (ref != nullptr && ref->resolved_kind ==
                HIR::resolved_::ResolvedKind::kFuncRef) {

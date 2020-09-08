@@ -335,16 +335,25 @@ UNOP(atanh,std::atanh)
   }
 
 #define REDUCE(NAME, OP, INIT)  template<class T, class U>\
-  void NAME##_v(operand_t st, operand_t value, operand_t result) {\
-    U& state = get_reference<U>(st, init_agg<U>(INIT));\
-    std::vector<T>& xs = get_reference<std::vector<T>>(value);\
-    U& y = get_reference<U>(result, state);\
+  void NAME##_v(operand_t left, operand_t result) {\
+    std::vector<T>& xs = get_reference<std::vector<T>>(left);\
+    U& y = get_reference<U>(result);\
+    y = init_agg<U>(INIT);\
     for (auto x: xs) {\
       if (!is_nil(x)) {\
         y = y OP x;\
       }\
     }\
-    state = y;\
+  }\
+  template<class T, class U>\
+  void stream_##NAME##_v(operand_t left, operand_t result) {\
+    std::vector<T>& xs = get_reference<std::vector<T>>(left);\
+    U& y = get_reference<U>(result, init_agg<U>(INIT));\
+    for (auto x: xs) {\
+      if (!is_nil(x)) {\
+        y = y OP x;\
+      }\
+    }\
   }
 
 REDUCE(sum,+,0)
@@ -459,7 +468,6 @@ UNIT(d,86400000000000)
     return result;
   }
 
-
 #define WRAPPER_S_V(FUNC) template<class T, class U>\
 void FUNC##_s(operand_t left, operand_t result) {\
   T x = get_value<T>(left);\
@@ -492,6 +500,120 @@ WRAPPER_V_V(reverse)
 #undef WRAPPER_S_V
 #undef WRAPPER_V_S
 #undef WRAPPER_V_V
+
+  /*** STREAM ***/
+
+  // stream len()
+  template<class T, class U>
+  void stream_len_v(operand_t left, operand_t result) {
+    const std::vector<T>& xs = get_reference<std::vector<T>>(left);
+    U& y = get_reference<U>(result, 0);
+    y += xs.size();
+  }
+
+  // stream count()
+  template<class T, class U>
+  void stream_count_v(operand_t left, operand_t result) {
+    const std::vector<T>& xs = get_reference<std::vector<T>>(left);
+    U& y = get_reference<U>(result, 0);
+    for (size_t i = 0; i < xs.size(); i++) {
+      if (!is_nil(xs[i])) {
+        y++;
+      }
+    }
+  }
+
+  // stream mean()
+  template<class T>
+  struct mean_state {
+    T mean;
+    int64_t count;
+    mean_state() : mean(0.0), count(0) {}
+  };
+
+  template<class T, class U>
+  void stream_mean_v(operand_t left, operand_t result) {
+    const std::vector<T>& xs = get_reference<std::vector<T>>(left);
+    mean_state<U>& y = get_reference<mean_state<U>>(result, mean_state<U>());
+
+    for (auto x: xs) {
+      if (!is_nil(x)) {
+        y.count++;
+        auto delta = x - y.mean;
+        y.mean += delta / y.count;
+      }
+    }
+
+    if (xs.empty()) {
+      y.mean = nil_value<U>();
+    }
+  }
+
+  // stream variance()
+  template<class T>
+  struct variance_state {
+    T variance;
+    T mean;
+    T m2;
+    int64_t count;
+    variance_state() : variance(0.0), mean(0.0), m2(0.0), count(0) {}
+  };
+
+  template<class T, class U>
+  void stream_variance_v(operand_t left, operand_t result) {
+    const std::vector<T>& xs = get_reference<std::vector<T>>(left);
+    variance_state<U>& y =
+      get_reference<variance_state<U>>(result, variance_state<U>());
+
+    for (auto x: xs) {
+      if (!is_nil(x)) {
+        y.count++;
+        auto delta = x - y.mean;
+        y.mean += delta / y.count;
+        auto delta2 = x - y.mean;
+        y.m2 += delta * delta2;
+      }
+    }
+
+    if (xs.size() <= 1) {
+      y.variance = nil_value<U>();
+    } else {
+      y.variance = y.m2 / y.count;
+    }
+  }
+
+  // stream stddev()
+  template<class T>
+  struct stddev_state {
+    T stddev;
+    T mean;
+    T m2;
+    int64_t count;
+    stddev_state() : stddev(0.0), mean(0.0), m2(0.0), count(0) {}
+  };
+
+  template<class T, class U>
+  void stream_stddev_v(operand_t left, operand_t result) {
+    const std::vector<T>& xs = get_reference<std::vector<T>>(left);
+    stddev_state<U>& y =
+      get_reference<stddev_state<U>>(result, stddev_state<U>());
+
+    for (auto x: xs) {
+      if (!is_nil(x)) {
+        y.count++;
+        auto delta = x - y.mean;
+        y.mean += delta / y.count;
+        auto delta2 = x - y.mean;
+        y.m2 += delta * delta2;
+      }
+    }
+
+    if (xs.size() <= 1) {
+      y.stddev = nil_value<U>();
+    } else {
+      y.stddev = std::sqrt(y.m2 / y.count);
+    }
+  }
 
   /*** REPR ***/
 

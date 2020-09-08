@@ -30,7 +30,7 @@ write %2
 
 ; sum the first floating-point column
 member %1 2 %3
-sum_f64v *0 %3 %4
+sum_f64v %3 %4
 repr %4 f64s %5
 write %5
 
