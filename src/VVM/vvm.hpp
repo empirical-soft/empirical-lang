@@ -24,9 +24,10 @@
 /*
  * Instructions (instr) in VVM are an opcode and any number of operands. These
  * are all numerical values. The opcode is dispatched to a function in the
- * interpreter. The operands may represent a register (local or global),
- * an immediate value, or a type parameter. Registers can hold scalars or
- * vectors and can be of any type, but immediates must be small scalar integers.
+ * interpreter. The operands may represent a register (local, global, or
+ * state), an immediate value, or a type parameter. Registers can hold scalars,
+ * vectors, or Dataframes; they can be of any type, but immediates must be
+ * small scalar integers.
  *
  * Directives in VVM can pre-set a global register (to define the constant
  * pool) or declare type definitions. Note that the constant pool can only
@@ -79,7 +80,8 @@ enum class OpMask : operand_t {
   kImmediate = 0,
   kLocal     = 1,
   kGlobal    = 2,
-  kType      = 3
+  kState     = 3,
+  kType      = 4
 };
 
 /*** constant pool ***/
@@ -140,6 +142,8 @@ std::string decode_types(const type_definition_t& td);
 std::string disassemble(const defined_types_t& dt);
 void verify_user_defined(type_t typee);
 
+OpMask get_operand_mask(operand_t op);
+size_t get_operand_value(operand_t op);
 operand_t encode_operand(const std::string& s);
 operand_t encode_operand(size_t s, OpMask mask);
 std::string decode_operand(operand_t op);

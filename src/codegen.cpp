@@ -151,7 +151,7 @@ class CodegenVisitor : public HIR::BaseVisitor {
   std::unordered_map<HIR::declaration_t, VVM::operand_t> reg_map_;
   std::unordered_map<HIR::FunctionDef_t, VVM::operand_t> func_map_;
   std::unordered_map<HIR::expr_t, VVM::operand_t> implied_reg_map_;
-  std::vector<size_t> last_operands_ = {0, 0, 0};
+  std::vector<size_t> last_operands_ = {0, 0, 0, 0};
 
   // return function or make it on demand
   VVM::operand_t func_map_get(HIR::FunctionDef_t fd) {
@@ -264,6 +264,16 @@ class CodegenVisitor : public HIR::BaseVisitor {
       reg_map_.erase(reg_map_.find(r));
     }
     streaming_registers_.clear();
+  }
+
+  // return streaming version of an opcode, if it exists
+  size_t lift_streaming(size_t op) {
+    try {
+      return VVM::encode_opcode("stream_" + VVM::opcode_strings[op]);
+    }
+    catch (std::exception& e) {
+      return op;
+    }
   }
 
   /* miscellaneous */
@@ -886,7 +896,18 @@ class CodegenVisitor : public HIR::BaseVisitor {
       // inline builtin functions
       HIR::VVMOpRef_t ptr = dynamic_cast<HIR::VVMOpRef_t>(ref);
       size_t opcode = ptr->opcode;
-      result = reserve_space();
+      // TODO XXX do this in functions that have been redefined for stream
+      if (node->mode == HIR::compmode_t::kStream) {
+        size_t stream_op = lift_streaming(opcode);
+        if (stream_op != opcode) {
+          opcode = stream_op;
+          result = reserve_space(VVM::OpMask::kState);
+        } else {
+          result = reserve_space();
+        }
+      } else {
+        result = reserve_space();
+      }
       params.push_back(result);
       emit(opcode, params);
     } else if (ref != nullptr && ref->resolved_kind ==
@@ -895,6 +916,7 @@ class CodegenVisitor : public HIR::BaseVisitor {
       HIR::FuncRef_t fr = dynamic_cast<HIR::FuncRef_t>(ref);
       HIR::FunctionDef_t fd = dynamic_cast<HIR::FunctionDef_t>(fr->ref);
       VVM::operand_t op = func_map_get(fd);
+      params.insert(params.begin(), reserve_space(VVM::OpMask::kState));
       result = reserve_space();
       params.push_back(result);
       VVM::operand_t length =

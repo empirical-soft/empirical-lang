@@ -70,7 +70,8 @@ class AssembleVisitor : public VVMAsmVisitor {
     return program;
   }
 
-  antlrcpp::Any visitInstruction(VVMAsmParser::InstructionContext *ctx) override {
+  antlrcpp::Any visitInstruction(VVMAsmParser::InstructionContext *ctx)
+    override {
     VVM::instructions_t code;
 
     // encond opcode
@@ -84,7 +85,6 @@ class AssembleVisitor : public VVMAsmVisitor {
       code.push_back(operand);
     }
 
-    // TODO verify arity for opcode
     return code;
   }
 
@@ -119,7 +119,8 @@ class AssembleVisitor : public VVMAsmVisitor {
     return VVM::encode_ptr(new int64_t(std::stol(ctx->getText())));
   }
 
-  antlrcpp::Any visitFloatValue(VVMAsmParser::FloatValueContext *ctx) override {
+  antlrcpp::Any visitFloatValue(VVMAsmParser::FloatValueContext *ctx)
+    override {
     return VVM::encode_ptr(new double(std::stod(ctx->getText())));
   }
 

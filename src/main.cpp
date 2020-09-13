@@ -66,6 +66,10 @@ R"(
   bitwise:       & | << >>
   boolean:       and or not
 
+# Info Functions
+
+  columns     members_of  mode_of     traits_of   type_of
+
 # Common Functions
 
   bar      count    exit     len      load     now
@@ -75,6 +79,15 @@ R"(
 
   acos   acosh  asin   asinh  atan   atanh
   cos    cosh   sin    sinh   tan    tanh
+
+# Table Syntax
+
+  sort table by expr+
+  from table select [[name=]expr+] [by [name=]expr+] [where expr]
+  join left, right [on expr+] [asof expr [nearest] [within expr]]
+
+  More than one expression is separated by comma (',').
+
 
 https://www.empirical-soft.com)";
 

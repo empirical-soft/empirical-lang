@@ -4,24 +4,24 @@
 end
 
 @1 = def bar(i64s, i64s, i64s) i64s:
-  call @0 3 %0 %1 %3
-  call @0 3 %3 %2 %4
+  call @0 4 *0 %0 %1 %3
+  call @0 4 *1 %3 %2 %4
   ret %4
 end
 
-call @0 3 17 23 %0
+call @0 4 *0 17 23 %0
 repr %0 i64s %1
 write %1
 
 ;;40
 
-call @0 3 %0 51 %2
+call @0 4 *1 %0 51 %2
 repr %2 i64s %3
 write %3
 
 ;;91
 
-call @1 4 %0 %2 9 %4
+call @1 5 *2 %0 %2 9 %4
 repr %4 i64s %5
 write %5
 

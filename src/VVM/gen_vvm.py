@@ -191,6 +191,7 @@ def _make_opcodes():
     for k, v in operators:
         for t in arithmetic_types:
             opcodes += [(v, k, '[%s]->%s' % (t, t), 2)]
+            opcodes += [('', 'stream_'+k, '[%s]->%s' % (t, t), 2)]
 
     # string concatenation
     operators = [('add', '+')]
@@ -204,6 +205,7 @@ def _make_opcodes():
     for k, v in operators:
         for t in string_types:
             opcodes += [(v, k, '[%s]->%s' % (t, t), 2)]
+            opcodes += [('', 'stream_'+k, '[%s]->%s' % (t, t), 2)]
 
     # time arithmetic
     operators = [('sub', '-')]
@@ -253,11 +255,13 @@ def _make_opcodes():
     for k, v in operators:
         for t in all_types:
             opcodes += [(v, k, '[%s]->Int64' % t, 2)]
+            opcodes += [('', 'stream_'+k, '[%s]->Int64' % t, 2)]
     operators = [('mean', 'mean'), ('variance', 'variance'),
                  ('stddev', 'stddev')]
     for k, v in operators:
         for t in arithmetic_types:
             opcodes += [(v, k, '[%s]->Float64' % t, 2)]
+            opcodes += [('', 'stream_'+k, '[%s]->Float64' % t, 2)]
     operators = [('reverse', 'reverse')]
     for k, v in operators:
         for t in all_types:
@@ -292,6 +296,7 @@ def _make_opcodes():
     opcodes += [("_print", "print", "[String]->()", 2)]
 
     return opcodes
+
 
 opcodes = _make_opcodes()
 
@@ -525,21 +530,22 @@ class BuiltinsWriter(HeaderWriter):
         ca_traits = pure | linear       # change array
         ra_traits = pure | transform    # random access
 
+        d = {'_stream_csv_load': io_traits | autostream,
+             '_csv_load': io_traits,
+             '_csv_store': none,
+             '_print': none,
+             'unique': ca_traits,
+             'filter': ca_traits,
+             'idx': ra_traits,
+             'multidx': ra_traits,
+             'sort': ra_traits,
+             'range': all_traits,
+             'stream_range': all_traits | autostream,
+             'now': io_traits}
+
         for o in opcodes:
             if len(o[0]) != 0:
                 traits = all_traits
-                d = {'_stream_csv_load': io_traits | autostream,
-                     '_csv_load': io_traits,
-                     '_csv_store': none,
-                     '_print': none,
-                     'unique': ca_traits,
-                     'filter': ca_traits,
-                     'idx': ra_traits,
-                     'multidx': ra_traits,
-                     'sort': ra_traits,
-                     'range': all_traits,
-                     'stream_range': all_traits | autostream,
-                     'now': io_traits}
                 if o[0] in d:
                   traits = d[o[0]]
                 oc = get_opcode(o[1], o[2])
@@ -596,11 +602,11 @@ class DisassemblerWriter(HeaderWriter):
                 s += ['" " << decode_operand(code[p + %d])' % (i+1)
                       for i in range(o[3])]
                 if oc == 'call':
-                    s += ['dis_code(code, ip, (code[p + %d] >> 2))' % o[3]]
+                    s += ['dis_code(code, ip, (code[p + %d] >> 3))' % o[3]]
                 s += ['std::endl;']
                 self.emit(' << '.join(s), 2)
                 if oc == 'call':
-                    self.emit('ip += (code[p + %d] >> 2);' % o[3], 2)
+                    self.emit('ip += (code[p + %d] >> 3);' % o[3], 2)
                 self.emit("goto *opcode_labels[code[ip]];", 2)
         self.emit('}')
         self.emit('#else  // _MSC_VER')
@@ -621,11 +627,11 @@ class DisassemblerWriter(HeaderWriter):
                 s += ['" " << decode_operand(code[p + %d])' % (i+1)
                       for i in range(o[3])]
                 if oc == 'call':
-                    s += ['dis_code(code, ip, (code[p + %d] >> 2))' % o[3]]
+                    s += ['dis_code(code, ip, (code[p + %d] >> 3))' % o[3]]
                 s += ['std::endl;']
                 self.emit(' << '.join(s), 4)
                 if oc == 'call':
-                    self.emit('ip += (code[p + %d] >> 2);' % o[3], 4)
+                    self.emit('ip += (code[p + %d] >> 3);' % o[3], 4)
                 self.emit("break;", 4)
         self.emit('}', 2)
         self.emit('}', 1)

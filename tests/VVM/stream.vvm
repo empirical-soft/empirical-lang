@@ -1,0 +1,172 @@
+; streaming operators maintain state while normal stats do not
+
+alloc i64v %0
+append 1 i64s %0
+append 2 i64s %0
+append 3 i64s %0
+
+alloc i64v %1
+append 4 i64s %1
+append 5 i64s %1
+append 6 i64s %1
+
+
+
+; normal stats on first array
+
+mean_i64v %0 %2
+cast_f64s_Ss %2 %3
+print_Ss %3 %4
+;;2.0
+
+variance_i64v %0 %5
+cast_f64s_Ss %5 %6
+print_Ss %6 %7
+;;0.666667
+
+stddev_i64v %0 %8
+cast_f64s_Ss %8 %9
+print_Ss %9 %10
+;;0.816497
+
+; normal stats on second array -- reused registers are overwritten
+
+mean_i64v %1 %2
+cast_f64s_Ss %2 %3
+print_Ss %3 %4
+;;5.0
+
+variance_i64v %1 %5
+cast_f64s_Ss %5 %6
+print_Ss %6 %7
+;;0.666667
+
+stddev_i64v %1 %8
+cast_f64s_Ss %8 %9
+print_Ss %9 %10
+;;0.816497
+
+; streaming stats on first array
+
+stream_mean_i64v %0 %12
+cast_f64s_Ss %12 %13
+print_Ss %13 %14
+;;2.0
+
+stream_variance_i64v %0 %15
+cast_f64s_Ss %15 %16
+print_Ss %16 %17
+;;0.666667
+
+stream_stddev_i64v %0 %18
+cast_f64s_Ss %18 %19
+print_Ss %19 %20
+;;0.816497
+
+; streaming stats on second array -- includes numbers from first
+
+stream_mean_i64v %1 %12
+cast_f64s_Ss %12 %13
+print_Ss %13 %14
+;;3.5
+
+stream_variance_i64v %1 %15
+cast_f64s_Ss %15 %16
+print_Ss %16 %17
+;;2.916667
+
+stream_stddev_i64v %1 %18
+cast_f64s_Ss %18 %19
+print_Ss %19 %20
+;;1.707825
+
+
+
+; normal aggregations on first array
+
+len_i64v %0 %22
+cast_i64s_Ss %22 %23
+print_Ss %23 %24
+;;3
+
+count_i64v %0 %25
+cast_i64s_Ss %25 %26
+print_Ss %26 %27
+;;3
+
+sum_i64v %0 %28
+cast_i64s_Ss %28 %29
+print_Ss %29 %30
+;;6
+
+prod_i64v %0 %31
+cast_i64s_Ss %31 %32
+print_Ss %32 %33
+;;6
+
+; normal aggregations on second array -- reused registers are overwritten
+
+len_i64v %1 %22
+cast_i64s_Ss %22 %23
+print_Ss %23 %24
+;;3
+
+count_i64v %1 %25
+cast_i64s_Ss %25 %26
+print_Ss %26 %27
+;;3
+
+sum_i64v %1 %28
+cast_i64s_Ss %28 %29
+print_Ss %29 %30
+;;15
+
+prod_i64v %1 %31
+cast_i64s_Ss %31 %32
+print_Ss %32 %33
+;;120
+
+; streaming aggregations on first array
+
+stream_len_i64v %0 %42
+cast_i64s_Ss %42 %43
+print_Ss %43 %44
+;;3
+
+stream_count_i64v %0 %45
+cast_i64s_Ss %45 %46
+print_Ss %46 %47
+;;3
+
+stream_sum_i64v %0 %48
+cast_i64s_Ss %48 %49
+print_Ss %49 %50
+;;6
+
+stream_prod_i64v %0 %51
+cast_i64s_Ss %51 %52
+print_Ss %52 %53
+;;6
+
+; streaming aggregations on second array -- includes numbers from first
+
+stream_len_i64v %1 %42
+cast_i64s_Ss %42 %43
+print_Ss %43 %44
+;;6
+
+stream_count_i64v %1 %45
+cast_i64s_Ss %45 %46
+print_Ss %46 %47
+;;6
+
+stream_sum_i64v %1 %48
+cast_i64s_Ss %48 %49
+print_Ss %49 %50
+;;21
+
+stream_prod_i64v %1 %51
+cast_i64s_Ss %51 %52
+print_Ss %52 %53
+;;720
+

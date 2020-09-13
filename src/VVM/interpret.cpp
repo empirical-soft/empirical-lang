@@ -58,8 +58,9 @@ class Interpreter {
 
   // register banks
   typedef std::vector<Value> register_bank_t;
-  register_bank_t global_registers_;
   register_bank_t local_registers_;
+  register_bank_t global_registers_;
+  register_bank_t state_registers_;
 
   // index into the register bank
   typedef operand_t index_t;
@@ -73,23 +74,25 @@ class Interpreter {
   // get register from operand as a pointer to the location in the bank
   template<class T>
   T** get_register(operand_t op) {
-    // get type of operand
-    OpMask mask = OpMask(op & 3);
+    // examine operand
+    index_t idx = get_operand_value(op);
+    OpMask mask = get_operand_mask(op);
     if (mask == OpMask::kImmediate) {
       std::ostringstream oss;
-      oss << "Was expecting a register, but got immediate value " << (op >> 2);
+      oss << "Was expecting a register, but got immediate value " << idx;
       throw std::logic_error(oss.str());
     }
     if (mask == OpMask::kType) {
       std::ostringstream oss;
-      oss << "Was expecting a register, but got type " << decode_type(op >> 2);
+      oss << "Was expecting a register, but got type " << decode_type(idx);
       throw std::logic_error(oss.str());
     }
 
-    // decode operand's info
-    register_bank_t& bank = (mask == OpMask::kLocal) ? local_registers_
-                                                     : global_registers_;
-    index_t idx = op >> 2;
+    // pick appropriate register bank
+    register_bank_t& bank =
+      ((mask == OpMask::kLocal) ? local_registers_ :
+       (mask == OpMask::kGlobal) ? global_registers_ :
+       state_registers_);
 
     // ensure that index is valid for particular register bank
     if (idx >= bank.size()) {
@@ -110,13 +113,24 @@ class Interpreter {
     return *ptr;
   }
 
+  // get a reference to a register's value, initializing if absent
+  template<class T>
+  T& get_reference(operand_t op, T init) {
+    T*& ptr = *get_register<T>(op);
+    if (ptr == nullptr) {
+      ptr = new T;
+      *ptr = init;
+    }
+    return *ptr;
+  }
+
   // get scalar value, either from register or from immediate
   template<class T>
   typename std::enable_if<std::is_integral<T>::value, T>::type
   get_value(operand_t op) {
-    OpMask mask = OpMask(op & 3);
+    OpMask mask = get_operand_mask(op);
     if (mask == OpMask::kImmediate) {
-      return op >> 2;
+      return get_operand_value(op);
     }
     return get_reference<T>(op);
   }
@@ -330,6 +344,16 @@ UNOP(atanh,std::atanh)
         y = y OP x;\
       }\
     }\
+  }\
+  template<class T, class U>\
+  void stream_##NAME##_v(operand_t left, operand_t result) {\
+    std::vector<T>& xs = get_reference<std::vector<T>>(left);\
+    U& y = get_reference<U>(result, init_agg<U>(INIT));\
+    for (auto x: xs) {\
+      if (!is_nil(x)) {\
+        y = y OP x;\
+      }\
+    }\
   }
 
 REDUCE(sum,+,0)
@@ -444,7 +468,6 @@ UNIT(d,86400000000000)
     return result;
   }
 
-
 #define WRAPPER_S_V(FUNC) template<class T, class U>\
 void FUNC##_s(operand_t left, operand_t result) {\
   T x = get_value<T>(left);\
@@ -477,6 +500,120 @@ WRAPPER_V_V(reverse)
 #undef WRAPPER_S_V
 #undef WRAPPER_V_S
 #undef WRAPPER_V_V
+
+  /*** STREAM ***/
+
+  // stream len()
+  template<class T, class U>
+  void stream_len_v(operand_t left, operand_t result) {
+    const std::vector<T>& xs = get_reference<std::vector<T>>(left);
+    U& y = get_reference<U>(result, 0);
+    y += xs.size();
+  }
+
+  // stream count()
+  template<class T, class U>
+  void stream_count_v(operand_t left, operand_t result) {
+    const std::vector<T>& xs = get_reference<std::vector<T>>(left);
+    U& y = get_reference<U>(result, 0);
+    for (size_t i = 0; i < xs.size(); i++) {
+      if (!is_nil(xs[i])) {
+        y++;
+      }
+    }
+  }
+
+  // stream mean()
+  template<class T>
+  struct mean_state {
+    T mean;
+    int64_t count;
+    mean_state() : mean(0.0), count(0) {}
+  };
+
+  template<class T, class U>
+  void stream_mean_v(operand_t left, operand_t result) {
+    const std::vector<T>& xs = get_reference<std::vector<T>>(left);
+    mean_state<U>& y = get_reference<mean_state<U>>(result, mean_state<U>());
+
+    for (auto x: xs) {
+      if (!is_nil(x)) {
+        y.count++;
+        auto delta = x - y.mean;
+        y.mean += delta / y.count;
+      }
+    }
+
+    if (xs.empty()) {
+      y.mean = nil_value<U>();
+    }
+  }
+
+  // stream variance()
+  template<class T>
+  struct variance_state {
+    T variance;
+    T mean;
+    T m2;
+    int64_t count;
+    variance_state() : variance(0.0), mean(0.0), m2(0.0), count(0) {}
+  };
+
+  template<class T, class U>
+  void stream_variance_v(operand_t left, operand_t result) {
+    const std::vector<T>& xs = get_reference<std::vector<T>>(left);
+    variance_state<U>& y =
+      get_reference<variance_state<U>>(result, variance_state<U>());
+
+    for (auto x: xs) {
+      if (!is_nil(x)) {
+        y.count++;
+        auto delta = x - y.mean;
+        y.mean += delta / y.count;
+        auto delta2 = x - y.mean;
+        y.m2 += delta * delta2;
+      }
+    }
+
+    if (xs.size() <= 1) {
+      y.variance = nil_value<U>();
+    } else {
+      y.variance = y.m2 / y.count;
+    }
+  }
+
+  // stream stddev()
+  template<class T>
+  struct stddev_state {
+    T stddev;
+    T mean;
+    T m2;
+    int64_t count;
+    stddev_state() : stddev(0.0), mean(0.0), m2(0.0), count(0) {}
+  };
+
+  template<class T, class U>
+  void stream_stddev_v(operand_t left, operand_t result) {
+    const std::vector<T>& xs = get_reference<std::vector<T>>(left);
+    stddev_state<U>& y =
+      get_reference<stddev_state<U>>(result, stddev_state<U>());
+
+    for (auto x: xs) {
+      if (!is_nil(x)) {
+        y.count++;
+        auto delta = x - y.mean;
+        y.mean += delta / y.count;
+        auto delta2 = x - y.mean;
+        y.m2 += delta * delta2;
+      }
+    }
+
+    if (xs.size() <= 1) {
+      y.stddev = nil_value<U>();
+    } else {
+      y.stddev = std::sqrt(y.m2 / y.count);
+    }
+  }
 
   /*** REPR ***/
 
@@ -635,7 +772,7 @@ WRAPPER_V_V(reverse)
   void repr(operand_t src, operand_t typee, operand_t dst) {
     verify_is_type(typee);
     std::string& y = get_reference<std::string>(dst);
-    y = represent(src, typee >> 2);
+    y = represent(src, get_operand_value(typee));
   }
 
   /*** LOAD ***/
@@ -709,14 +846,14 @@ WRAPPER_V_V(reverse)
   void load(operand_t src, operand_t typee, operand_t dst) {
     verify_is_type(typee);
     Dataframe& y = get_reference<Dataframe>(dst);
-    y = loader(src, typee >> 2);
+    y = loader(src, get_operand_value(typee));
   }
 
   // streaming load operation -- TODO currently a stub
   void stream_load(operand_t src, operand_t typee, operand_t dst) {
     verify_is_type(typee);
     Dataframe& y = get_reference<Dataframe>(dst);
-    y = loader(src, typee >> 2);
+    y = loader(src, get_operand_value(typee));
   }
 
 
@@ -787,7 +924,7 @@ WRAPPER_V_V(reverse)
     std::string filename = get_value<std::string>(fn);
     int64_t& z = get_reference<int64_t>(res);
     z = 0;
-    storer(typee >> 2, src, filename);
+    storer(get_operand_value(typee), src, filename);
   }
 
   /*** INFER ***/
@@ -863,7 +1000,7 @@ WRAPPER_V_V(reverse)
   // assign operation
   void assign(operand_t src, operand_t typee, operand_t dst) {
     verify_is_type(typee);
-    assigner(src, typee >> 2, dst);
+    assigner(src, get_operand_value(typee), dst);
   }
 
   /*** APPEND ***/
@@ -897,7 +1034,7 @@ WRAPPER_V_V(reverse)
   // append operation
   void append(operand_t src, operand_t typee, operand_t dst) {
     verify_is_type(typee);
-    appender(src, typee >> 2, dst);
+    appender(src, get_operand_value(typee), dst);
   }
 
   /*** CAST ***/
@@ -997,7 +1134,7 @@ WRAPPER_V_V(reverse)
     verify_is_type(typee);
     Dataframe& y = get_reference<Dataframe>(dst);
     std::vector<bool>& tr = get_reference<std::vector<bool>>(truths);
-    y = where_rows(src, tr, typee >> 2);
+    y = where_rows(src, tr, get_operand_value(typee));
   }
 
   // multidx operation
@@ -1006,7 +1143,7 @@ WRAPPER_V_V(reverse)
     verify_is_type(typee);
     Dataframe& y = get_reference<Dataframe>(dst);
     std::vector<int64_t>& idxs = get_reference<std::vector<int64_t>>(indices);
-    y = where_rows(src, idxs, typee >> 2);
+    y = where_rows(src, idxs, get_operand_value(typee));
   }
 
   /*** REVERSE ***/
@@ -1061,7 +1198,7 @@ WRAPPER_V_V(reverse)
   void reverse(operand_t src, operand_t typee, operand_t dst) {
     verify_is_type(typee);
     Dataframe& y = get_reference<Dataframe>(dst);
-    y = reverser(src, typee >> 2);
+    y = reverser(src, get_operand_value(typee));
   }
 
   /*** MISC ***/
@@ -1184,7 +1321,7 @@ WRAPPER_V_V(reverse)
   void alloc(operand_t typee, operand_t dst) {
     verify_is_type(typee);
     Value& reg = *get_register<void>(dst);
-    reg = allocate(typee >> 2);
+    reg = allocate(get_operand_value(typee));
   }
 
   // member operation
@@ -1236,7 +1373,7 @@ WRAPPER_V_V(reverse)
   // guarantee a pointer from the operand; wrap immediate values
   void* get_ptr(type_t typee, operand_t op) {
     TypeMask type_mask = TypeMask(typee & 1);
-    OpMask op_mask = OpMask(op & 3);
+    OpMask op_mask = get_operand_mask(op);
     if (type_mask == TypeMask::kUserDefined || op_mask != OpMask::kImmediate) {
       return *get_register<void>(op);
     }
@@ -1247,7 +1384,7 @@ WRAPPER_V_V(reverse)
   void call(operand_t func, operand_t num_params,
             const instructions_t& bytecode) {
     FunctionDef& fd = get_reference<FunctionDef>(func);
-    int64_t np = get_value<int64_t>(num_params) - 1;
+    int64_t np = get_value<int64_t>(num_params) - 1;  // ignore return
 
     // ensure that argument count is what we expect
     if (np < 0) {
@@ -1255,38 +1392,44 @@ WRAPPER_V_V(reverse)
                         " requires location of return value";
       throw std::runtime_error(msg);
     }
-    if (np != fd.args.size()) {
+    int64_t expected_np = fd.args.size() + 1;
+    if (np != expected_np) {
       std::ostringstream oss;
       oss << "Calling " << fd.name << " with wrong number of arguments: "
-          << np << " vs " << fd.args.size()
-          << " (must include location of return value)";
+          << np << " vs " << expected_np
+          << " (must include state register and location of return value)";
       throw std::runtime_error(oss.str());
     }
 
-    // copy pointers from operands to a new register bank
+    // copy pointers from operands to a new register bank (first is state)
     auto bc = &bytecode[ip_];
-    register_bank_t new_registers(np);
-    for (size_t i = 0; i < new_registers.size(); i++) {
+    register_bank_t new_local(np - 1);
+    for (size_t i = 1; i < np; i++) {
       operand_t op = bc[i];
-      new_registers[i] = get_ptr(fd.args[i].typee, op);
+      new_local[i - 1] = get_ptr(fd.args[i - 1].typee, op);
     }
+    register_bank_t& new_state = get_reference<register_bank_t>(bc[0]);
 
     // move IP to end of operands
     ip_ += (np + 1);
 
     // save frame information
-    register_bank_t saved_registers = std::move(local_registers_);
+    register_bank_t saved_locals = std::move(local_registers_);
+    register_bank_t saved_states = std::move(state_registers_);
     size_t saved_ip = ip_;
 
     // dispatch the new bytecode; this is mutually recursive
-    local_registers_ = std::move(new_registers);
+    local_registers_ = std::move(new_local);
+    state_registers_ = std::move(new_state);
     dispatch(fd.body);
 
     // having returned from the user's function call, save result
     Value ret_value = get_ptr(fd.rettype, ret_op_);
+    new_state = std::move(state_registers_);
 
     // restore frame information
-    local_registers_ = std::move(saved_registers);
+    local_registers_ = std::move(saved_locals);
+    state_registers_ = std::move(saved_states);
     ip_ = saved_ip;
 
     // save the returned result now that we have our registers back
@@ -1358,7 +1501,7 @@ WRAPPER_V_V(reverse)
   void isort(operand_t src, operand_t typee, operand_t dst) {
     verify_is_type(typee);
     std::vector<int64_t>& y = get_reference<std::vector<int64_t>>(dst);
-    y = isort_cols(src, typee >> 2);
+    y = isort_cols(src, get_operand_value(typee));
   }
 
   /*** CATEGORIZE ***/
@@ -1628,7 +1771,8 @@ WRAPPER_V_V(reverse)
       get_reference<std::vector<Dataframe*>>(df_vec);
     int64_t& z = get_reference<int64_t>(length);
 
-    group_df(df_type >> 2, df, key_type >> 2, keys, ret_type >> 2, x, y, z);
+    group_df(get_operand_value(df_type), df, get_operand_value(key_type), keys,
+             get_operand_value(ret_type), x, y, z);
   }
 
   /*** JOIN ***/
@@ -1688,7 +1832,7 @@ WRAPPER_V_V(reverse)
     std::vector<int64_t>& right =
       get_reference<std::vector<int64_t>>(right_indices);
 
-    eqmatch_df(typee >> 2, left_df, right_df, left, right);
+    eqmatch_df(get_operand_value(typee), left_df, right_df, left, right);
   }
 
   // The asof functions below are separated for types that have subtraction
@@ -1951,7 +2095,8 @@ WRAPPER_V_V(reverse)
         categorize_df2(typee, left_df, right_df, llabs, rlabs);
 
         std::vector<T>& left_values = get_reference<std::vector<T>>(left_arr);
-        std::vector<T>& right_values = get_reference<std::vector<T>>(right_arr);
+        std::vector<T>& right_values =
+          get_reference<std::vector<T>>(right_arr);
 
         left_indices.resize(left_values.size());
         std::iota(std::begin(left_indices), std::end(left_indices), 0);
@@ -2046,7 +2191,8 @@ WRAPPER_V_V(reverse)
         categorize_df2(typee, left_df, right_df, llabs, rlabs);
 
         std::vector<T>& left_values = get_reference<std::vector<T>>(left_arr);
-        std::vector<T>& right_values = get_reference<std::vector<T>>(right_arr);
+        std::vector<T>& right_values =
+          get_reference<std::vector<T>>(right_arr);
         using DiffType = decltype(left_values[0] - right_values[0]);
 
         left_indices.resize(left_values.size());
@@ -2138,7 +2284,8 @@ WRAPPER_V_V(reverse)
         categorize_df2(typee, left_df, right_df, llabs, rlabs);
 
         std::vector<T>& left_values = get_reference<std::vector<T>>(left_arr);
-        std::vector<T>& right_values = get_reference<std::vector<T>>(right_arr);
+        std::vector<T>& right_values =
+          get_reference<std::vector<T>>(right_arr);
         using DiffType = decltype(left_values[0] - right_values[0]);
         DiffType within = get_value<DiffType>(within_value);
 
@@ -2226,8 +2373,8 @@ WRAPPER_V_V(reverse)
             }
 
             if (right_pos < right_values.size()) {
-              // find first position in left whose value is greater than right's
-              // and store dependencies for each label along the way
+              // find first position in left whose value is greater than
+              // right's and store dependencies for each label along the way
               // and pre-fill last-seen value in case we don't see it again
               while (left_pos < left_values.size() &&
                      left_values[left_pos] <= right_values[right_pos]) {
@@ -2243,7 +2390,8 @@ WRAPPER_V_V(reverse)
                 left_pos++;
               }
 
-              // compare positions and restore for this label if 'within' is met
+              // compare positions and restore for this label if 'within' is
+              // met
               auto next_iter = ml.find(rlabs[right_pos]);
               if (next_iter != ml.end()) {
                 int64_t next_pos = right_pos;
@@ -2274,7 +2422,8 @@ WRAPPER_V_V(reverse)
                 ml.erase(next_iter);
               }
             } else {
-              // save last-seen position as the desired index if 'within' is met
+              // save last-seen position as the desired index if 'within' is
+              // met
               auto iter = mr.find(llabs[left_pos]);
               if (iter != mr.end()) {
                 int64_t pos = iter->second;
@@ -2298,7 +2447,7 @@ WRAPPER_V_V(reverse)
                  operand_t strictness, operand_t direct,
                  operand_t left_result, operand_t right_result) {
     verify_is_type(typee);
-    type_t type_code = typee >> 2;
+    type_t type_code = get_operand_value(typee);
     vvm_types vvm_typee = static_cast<vvm_types>(type_code >> 1);
 
     bool strict = get_value<bool>(strictness);
@@ -2317,7 +2466,7 @@ WRAPPER_V_V(reverse)
                 operand_t strictness, operand_t direct,
                 operand_t left_result, operand_t right_result) {
     verify_is_type(typee);
-    type_t type_code = typee >> 2;
+    type_t type_code = get_operand_value(typee);
     vvm_types vvm_typee = static_cast<vvm_types>(type_code >> 1);
 
     bool strict = get_value<bool>(strictness);
@@ -2336,7 +2485,7 @@ WRAPPER_V_V(reverse)
                operand_t strictness, operand_t direct, operand_t within,
                operand_t left_result, operand_t right_result) {
     verify_is_type(typee);
-    type_t type_code = typee >> 2;
+    type_t type_code = get_operand_value(typee);
     vvm_types vvm_typee = static_cast<vvm_types>(type_code >> 1);
 
     bool strict = get_value<bool>(strictness);
@@ -2352,13 +2501,13 @@ WRAPPER_V_V(reverse)
 
   // eqasofmatch operation
   void eqasofmatch(operand_t df_typee, operand_t left_df, operand_t right_df,
-                   operand_t arr_typee, operand_t left_arr, operand_t right_arr,
-                   operand_t strictness, operand_t direct,
+                   operand_t arr_typee, operand_t left_arr,
+                   operand_t right_arr, operand_t strictness, operand_t direct,
                    operand_t left_result, operand_t right_result) {
     verify_is_type(df_typee);
     verify_is_type(arr_typee);
 
-    type_t type_code = arr_typee >> 2;
+    type_t type_code = get_operand_value(arr_typee);
     vvm_types vvm_typee = static_cast<vvm_types>(type_code >> 1);
 
     bool strict = get_value<bool>(strictness);
@@ -2368,8 +2517,9 @@ WRAPPER_V_V(reverse)
     std::vector<int64_t>& right_indices =
       get_reference<std::vector<int64_t>>(right_result);
 
-    eqasofmatch_df(vvm_typee, df_typee >> 2, left_df, right_df, left_arr,
-                   right_arr, strict, direction, left_indices, right_indices);
+    eqasofmatch_df(vvm_typee, get_operand_value(df_typee), left_df, right_df,
+                   left_arr, right_arr, strict, direction, left_indices,
+                   right_indices);
   }
 
   // eqasofnear operation
@@ -2380,7 +2530,7 @@ WRAPPER_V_V(reverse)
     verify_is_type(df_typee);
     verify_is_type(arr_typee);
 
-    type_t type_code = arr_typee >> 2;
+    type_t type_code = get_operand_value(arr_typee);
     vvm_types vvm_typee = static_cast<vvm_types>(type_code >> 1);
 
     bool strict = get_value<bool>(strictness);
@@ -2390,20 +2540,21 @@ WRAPPER_V_V(reverse)
     std::vector<int64_t>& right_indices =
       get_reference<std::vector<int64_t>>(right_result);
 
-    eqasofnear_df(vvm_typee, df_typee >> 2, left_df, right_df, left_arr,
-                   right_arr, strict, direction, left_indices, right_indices);
+    eqasofnear_df(vvm_typee, get_operand_value(df_typee), left_df, right_df,
+                  left_arr, right_arr, strict, direction, left_indices,
+                  right_indices);
   }
 
   // eqasofwithin operation
   void eqasofwithin(operand_t df_typee, operand_t left_df, operand_t right_df,
                     operand_t arr_typee, operand_t left_arr,
-                    operand_t right_arr, operand_t strictness, operand_t direct,
-                    operand_t within, operand_t left_result,
+                    operand_t right_arr, operand_t strictness,
+                    operand_t direct, operand_t within, operand_t left_result,
                     operand_t right_result) {
     verify_is_type(df_typee);
     verify_is_type(arr_typee);
 
-    type_t type_code = arr_typee >> 2;
+    type_t type_code = get_operand_value(arr_typee);
     vvm_types vvm_typee = static_cast<vvm_types>(type_code >> 1);
 
     bool strict = get_value<bool>(strictness);
@@ -2413,9 +2564,9 @@ WRAPPER_V_V(reverse)
     std::vector<int64_t>& right_indices =
       get_reference<std::vector<int64_t>>(right_result);
 
-    eqasofwithin_df(vvm_typee, df_typee >> 2, left_df, right_df, left_arr,
-                    right_arr, strict, direction, within, left_indices,
-                    right_indices);
+    eqasofwithin_df(vvm_typee, get_operand_value(df_typee), left_df, right_df,
+                    left_arr, right_arr, strict, direction, within,
+                    left_indices, right_indices);
   }
 
   // take columns from a Dataframe according to the new type
@@ -2455,7 +2606,7 @@ WRAPPER_V_V(reverse)
     Dataframe& xs = get_reference<Dataframe>(src);
     Dataframe& ys = get_reference<Dataframe>(dst);
 
-    take_df(old_type >> 2, new_type >> 2, xs, ys);
+    take_df(get_operand_value(old_type), get_operand_value(new_type), xs, ys);
   }
 
   // merge two Dataframes together
@@ -2491,7 +2642,7 @@ WRAPPER_V_V(reverse)
     Dataframe& ys = get_reference<Dataframe>(right);
     Dataframe& zs = get_reference<Dataframe>(result);
 
-    concat_df(result_type >> 2, xs, ys, zs);
+    concat_df(get_operand_value(result_type), xs, ys, zs);
   }
 
  public:
