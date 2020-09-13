@@ -266,6 +266,16 @@ class CodegenVisitor : public HIR::BaseVisitor {
     streaming_registers_.clear();
   }
 
+  // return streaming version of an opcode, if it exists
+  size_t lift_streaming(size_t op) {
+    try {
+      return VVM::encode_opcode("stream_" + VVM::opcode_strings[op]);
+    }
+    catch (std::exception& e) {
+      return op;
+    }
+  }
+
   /* miscellaneous */
 
   bool interactive_;
@@ -886,7 +896,18 @@ class CodegenVisitor : public HIR::BaseVisitor {
       // inline builtin functions
       HIR::VVMOpRef_t ptr = dynamic_cast<HIR::VVMOpRef_t>(ref);
       size_t opcode = ptr->opcode;
-      result = reserve_space();
+      // TODO XXX do this in functions that have been redefined for stream
+      if (node->mode == HIR::compmode_t::kStream) {
+        size_t stream_op = lift_streaming(opcode);
+        if (stream_op != opcode) {
+          opcode = stream_op;
+          result = reserve_space(VVM::OpMask::kState);
+        } else {
+          result = reserve_space();
+        }
+      } else {
+        result = reserve_space();
+      }
       params.push_back(result);
       emit(opcode, params);
     } else if (ref != nullptr && ref->resolved_kind ==
