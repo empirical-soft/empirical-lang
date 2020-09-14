@@ -256,6 +256,10 @@ def _make_opcodes():
         for t in all_types:
             opcodes += [(v, k, '[%s]->Int64' % t, 2)]
             opcodes += [('', 'stream_'+k, '[%s]->Int64' % t, 2)]
+    operators = [('len', 'len')]
+    for k, v in operators:
+        for t in string_types:
+            opcodes += [(v, k, '%s->Int64' % t, 2)]
     operators = [('mean', 'mean'), ('variance', 'variance'),
                  ('stddev', 'stddev')]
     for k, v in operators:
@@ -266,6 +270,8 @@ def _make_opcodes():
     for k, v in operators:
         for t in all_types:
             opcodes += [(v, k, '[%s]->[%s]' % (t, t), 2)]
+        for t in string_types:
+            opcodes += [(v, k, '%s->%s' % (t, t), 2)]
 
     # del operator
     operators = [('del', 1)]
