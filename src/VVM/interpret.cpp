@@ -400,6 +400,11 @@ UNIT(d,86400000000000)
     return xs.size();
   }
 
+  // len() for String
+  int64_t internal_len(const std::string& s) {
+    return s.size();
+  }
+
   // count()
   template<class T>
   int64_t internal_count(const std::vector<T>& xs) {
@@ -468,6 +473,19 @@ UNIT(d,86400000000000)
     return result;
   }
 
+  // reverse() for String
+  std::string internal_reverse(const std::string& s) {
+    std::string result(s.rbegin(), s.rend());
+    return result;
+  }
+
+#define WRAPPER_S_S(FUNC) template<class T, class U>\
+void FUNC##_s(operand_t left, operand_t result) {\
+  T x = get_value<T>(left);\
+  U& y = get_reference<U>(result);\
+  y = internal_##FUNC(x);\
+}
+
 #define WRAPPER_S_V(FUNC) template<class T, class U>\
 void FUNC##_s(operand_t left, operand_t result) {\
   T x = get_value<T>(left);\
@@ -491,11 +509,13 @@ void FUNC##_v(operand_t left, operand_t result) {\
 
 WRAPPER_S_V(range)
 WRAPPER_V_S(len)
+WRAPPER_S_S(len)
 WRAPPER_V_S(count)
 WRAPPER_V_S(mean)
 WRAPPER_V_S(variance)
 WRAPPER_V_S(stddev)
 WRAPPER_V_V(reverse)
+WRAPPER_S_S(reverse)
 
 #undef WRAPPER_S_V
 #undef WRAPPER_V_S

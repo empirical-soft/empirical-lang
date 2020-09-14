@@ -21,6 +21,17 @@ These tests cover `len()`.
 
 ```
 
+### String
+
+```
+>>> len("")
+0
+
+>>> len("Hello")
+5
+
+```
+
 ### Scalars -- error
 
 ```
@@ -33,7 +44,7 @@ Error: unable to match overloaded function len
   candidate: ([Bool]) -> Int64
     argument type at position 0 does not match: Int64 vs [Bool]
   ...
-  <7 others>
+  <8 others>
 
 >>> len(Person("A", 1))
 Error: unable to match overloaded function len
@@ -44,6 +55,6 @@ Error: unable to match overloaded function len
   candidate: ([Bool]) -> Int64
     argument type at position 0 does not match: Person vs [Bool]
   ...
-  <7 others>
+  <8 others>
 
 ```

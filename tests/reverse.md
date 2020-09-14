@@ -23,6 +23,17 @@ These tests cover `reverse()`.
 
 ```
 
+### String
+
+```
+>>> reverse("")
+""
+
+>>> reverse("Hello")
+"olleH"
+
+```
+
 ### Scalars -- error
 
 ```
@@ -35,7 +46,7 @@ Error: unable to match overloaded function reverse
   candidate: ([Bool]) -> [Bool]
     argument type at position 0 does not match: Int64 vs [Bool]
   ...
-  <7 others>
+  <8 others>
 
 >>> reverse(Person("A", 1))
 Error: unable to match overloaded function reverse
@@ -46,6 +57,6 @@ Error: unable to match overloaded function reverse
   candidate: ([Bool]) -> [Bool]
     argument type at position 0 does not match: Person vs [Bool]
   ...
-  <7 others>
+  <8 others>
 
 ```
