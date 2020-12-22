@@ -45,14 +45,14 @@ jobs:
         env:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
-        run: ${{ make }} prod
+        run: ${{ matrix.make }} prod
 
       - name: Test
         env:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
-        run: ${{ make }} test
+        run: ${{ matrix.make }} test
 
       - name: Deploy
-        run: ${{ make }} deploy
+        run: ${{ matrix.make }} deploy
 
