@@ -1,0 +1,38 @@
+name: Empirical CI
+
+on: [push, pull_request]
+
+env:
+  BUILD_TYPE: MinSizeRel
+
+jobs:
+  build:
+    name: ${{ matrix.config.name }}
+    runs-on: ${{ matrix.config.os }}
+
+    strategy:
+      matrix:
+        # https://github.com/actions/virtual-environments
+        config:
+        - {
+            name: mac
+            os: macos-10.15
+          }
+        - {
+            name: linux
+            os: ubuntu-16.04
+          }
+
+    steps:
+      # https://docs.github.com/en/free-pro-team@latest/actions/reference/workflow-syntax-for-github-actions#using-a-specific-shell
+      - uses: actions/checkout@v2
+
+      - name: Build
+        run: make prod
+
+      - name: Test
+        run: make test
+
+      - name: Deploy
+        run: make deploy
+
