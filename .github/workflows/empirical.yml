@@ -16,16 +16,22 @@ jobs:
     strategy:
       matrix:
         # https://github.com/actions/virtual-environments
-        #os: [macos-10.15, ubuntu-16.04]
         include:
           - name: mac
             os: macos-10.15
+            make: make
             cc: ""
             cxx: ""
           - name: linux
             os: ubuntu-16.04
+            make: make
             cc: gcc-8
             cxx: g++-8
+          - name: windows
+            os: windows-2016
+            make: .\make.bat
+            cc: ""
+            cxx: ""
 
     steps:
       # https://docs.github.com/en/free-pro-team@latest/actions/reference/workflow-syntax-for-github-actions#using-a-specific-shell
@@ -39,14 +45,14 @@ jobs:
         env:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
-        run: make prod
+        run: ${{ make }} prod
 
       - name: Test
         env:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
-        run: make test
+        run: ${{ make }} test
 
       - name: Deploy
-        run: make deploy
+        run: ${{ make }} deploy
 
