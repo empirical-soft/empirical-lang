@@ -17,17 +17,27 @@ jobs:
         include:
           - os: macos-10.15
             name: mac
+            cc: ""
+            cxx: ""
           - os: ubuntu-16.04
             name: linux
+            cc: gcc-8
+            cxx: g++-8
 
     steps:
       # https://docs.github.com/en/free-pro-team@latest/actions/reference/workflow-syntax-for-github-actions#using-a-specific-shell
       - uses: actions/checkout@v2
 
       - name: Build
+        env:
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
         run: make prod
 
       - name: Test
+        env:
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
         run: make test
 
       - name: Deploy
