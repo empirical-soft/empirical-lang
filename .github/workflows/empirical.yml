@@ -44,7 +44,6 @@ jobs:
         run: ${{ matrix.make }} prod
 
       - name: Test
-        env:
         run: ${{ matrix.make }} test
 
       - name: Deploy
