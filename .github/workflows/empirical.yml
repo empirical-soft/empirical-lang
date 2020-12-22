@@ -1,4 +1,4 @@
-name: Empirical CI
+name: Empirical
 
 on: [push, pull_request]
 
@@ -20,8 +20,6 @@ jobs:
           - name: mac
             os: macos-10.15
             make: make
-            cc: ""
-            cxx: ""
           - name: linux
             os: ubuntu-16.04
             make: make
@@ -30,8 +28,6 @@ jobs:
           - name: windows
             os: windows-2016
             make: .\make.bat
-            cc: ""
-            cxx: ""
 
     steps:
       # https://docs.github.com/en/free-pro-team@latest/actions/reference/workflow-syntax-for-github-actions#using-a-specific-shell
@@ -49,8 +45,6 @@ jobs:
 
       - name: Test
         env:
-          CC: ${{ matrix.cc }}
-          CXX: ${{ matrix.cxx }}
         run: ${{ matrix.make }} test
 
       - name: Deploy
