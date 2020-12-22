@@ -13,7 +13,8 @@ jobs:
     strategy:
       matrix:
         # https://github.com/actions/virtual-environments
-        on: [macos-10.15, ubuntu-16.04]
+        #os: [macos-10.15, ubuntu-16.04]
+        os: [ubuntu-16.04]
         include:
           - os: macos-10.15
             name: mac
@@ -27,6 +28,10 @@ jobs:
     steps:
       # https://docs.github.com/en/free-pro-team@latest/actions/reference/workflow-syntax-for-github-actions#using-a-specific-shell
       - uses: actions/checkout@v2
+
+      - name: Prep
+        if: ${{ matrix.name == 'linux' }}
+        run: sudo apt-get install uuid-dev
 
       - name: Build
         env:
