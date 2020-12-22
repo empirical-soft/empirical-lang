@@ -73,7 +73,7 @@ You should get a message from GitHub alerting you to where you can "create a pul
 It will help to list which issue this change addresses. For example:
 
 ```
-closes #123
+fixes #123
 ```
 
 Making the pull request will trigger testing on all target platforms. Fix any errors that you see and re-push your new changes; they will automatically be reflected in the existing PR.

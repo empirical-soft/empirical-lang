@@ -1,8 +1,7 @@
 <p align="center"><img src="https://www.empirical-soft.com/logo.png"></p>
 
 <p align="center">
-<a href="https://ci.appveyor.com/project/chrisaycock/empirical-lang"><img src="https://ci.appveyor.com/api/projects/status/t0l0fewb96t82bup?svg=true" alt="Build Status"></a>
-<a href="https://travis-ci.com/chrisaycock/empirical-lang"><img src="https://travis-ci.com/chrisaycock/empirical-lang.svg?branch=master" alt="Build Status"></a>
+<a href="https://github.com/empirical-soft/empirical-lang/actions?query=workflow%3AEmpirical"><img src="https://github.com/empirical-soft/empirical-lang/workflows/Empirical/badge.svg" alt="Build Status"></a>
 </p>
 
 ## About Empirical

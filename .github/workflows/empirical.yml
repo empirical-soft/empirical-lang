@@ -30,7 +30,6 @@ jobs:
             make: .\make.bat
 
     steps:
-      # https://docs.github.com/en/free-pro-team@latest/actions/reference/workflow-syntax-for-github-actions#using-a-specific-shell
       - uses: actions/checkout@v2
 
       - name: Prep

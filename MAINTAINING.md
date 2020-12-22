@@ -1,9 +1,5 @@
 # Maintainer's Notes
 
-## Continuous Integration
-
-We use [AppVeyor](https://ci.appveyor.com/project/chrisaycock/empirical-lang/history) for Windows and [Travis CI](https://travis-ci.com/empirical-soft/empirical-lang/branches) for Linux and Mac. Deployment from these rely on [@chrisaycock](https://github.com/chrisaycock)'s *personal access tokens*.
-
 ## Pull Requests
 
 PRs are accepted as a **squash** merge. (All other types are disabled.)
