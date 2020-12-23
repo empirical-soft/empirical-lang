@@ -49,7 +49,7 @@ GenVVM_TARGET(${CMAKE_CURRENT_BINARY_DIR}/VVM)
 # system configurations
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
   execute_process(
-    COMMAND git describe --always
+    COMMAND git describe --tags --always
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     OUTPUT_VARIABLE EMPIRICAL_VERSION
     OUTPUT_STRIP_TRAILING_WHITESPACE)
