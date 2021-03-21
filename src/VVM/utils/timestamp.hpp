@@ -1,7 +1,7 @@
 /*
  * Timestamp header -- defines timestamp and related types
  *
- * Copyright (C) 2019--2020 Empirical Software Solutions, LLC
+ * Copyright (C) 2019--2021 Empirical Software Solutions, LLC
  *
  * This program is distributed under the terms of the GNU Affero General
  * Public License with the Commons Clause.

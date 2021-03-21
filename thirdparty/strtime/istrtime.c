@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019--2020 Empirical Software Solutions, LLC
+ * Copyright (C) 2019--2021 Empirical Software Solutions, LLC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
